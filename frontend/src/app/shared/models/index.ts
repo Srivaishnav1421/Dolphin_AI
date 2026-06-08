@@ -38,14 +38,32 @@ export interface Campaign {
 export interface Lead {
   id:               string;
   name:             string;
+  phone?:           string;
+  email?:           string;
   message:          string;
   score:            number;
   status:           'HOT' | 'WARM' | 'COLD' | 'UNQUALIFIABLE';
+  pipeline_stage?:  'NEW_LEAD' | 'CONTACTED' | 'QUALIFIED' | 'INTERESTED' | 'PROPOSAL_SENT' | 'FOLLOW_UP' | 'NEGOTIATION' | 'CONVERTED' | 'LOST' | 'DORMANT' | 'RECYCLED';
+  priority?:        'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   budget_signal:    string | null;
   timeline_signal:  string | null;
   intent_signal:    string | null;
   location_signal:  string | null;
   source:           string;
+  campaign_id?:     string;
+  assigned_user_id?: string;
+  tags?:            string;
+  notes?:           string;
+  budget?:          number;
+  interest_category?: string;
+  location?:        string;
+  last_contacted_at?: string;
+  next_follow_up_at?: string;
+  conversion_probability?: number;
+  expected_revenue?: number;
+  lost_reason?:     string;
+  ai_summary?:      string;
+  next_best_action?: string;
   gemini_analysis?: string;
   created_at:       string;
 }

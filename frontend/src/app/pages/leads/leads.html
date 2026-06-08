@@ -1,8 +1,8 @@
 <div class="page animate-fade-in">
   <div class="page-header">
     <div>
-      <h1>🔥 Lead Center</h1>
-      <p>Incoming leads — AI-scored by Gemini 1.5 Pro in real-time</p>
+      <h1>Lead Center</h1>
+      <p>Capture, qualify, follow up, and convert leads from every channel</p>
     </div>
     <div style="display:flex;gap:10px;align-items:center">
       <!-- Toggle between Kanban and List view -->
@@ -18,7 +18,7 @@
       @if (message()) {
         <span class="msg-chip animate-fade-in" [style.color]="message().startsWith('✅') ? 'var(--success)' : 'var(--warning)'">{{ message() }}</span>
       }
-      <button class="btn btn-primary" (click)="openForm()">🧠 Score New Lead</button>
+      <button class="btn btn-primary" (click)="openForm()">Add Lead</button>
       <button class="btn btn-ghost" (click)="load()">↺ Refresh</button>
     </div>
   </div>
@@ -28,7 +28,7 @@
     <div class="modal-overlay animate-fade-in" (click)="closeForm()">
       <div class="modal-box" (click)="$event.stopPropagation()">
         <div class="modal-header">
-          <h3>🧠 Score New Lead with Gemini</h3>
+          <h3>Add and qualify lead</h3>
           <button class="modal-close" (click)="closeForm()">✕</button>
         </div>
         <div class="form-grid">
@@ -49,12 +49,12 @@
           </div>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin:0 24px 16px;padding:10px;background:rgba(0,212,255,0.05);border-radius:8px;border:1px solid rgba(0,212,255,0.1)">
-          ✨ Gemini 1.5 Pro will analyze the message and assign a HOT/WARM/COLD score with qualification signals
+          AI will analyze the enquiry and suggest lead quality, priority, and next action in business language.
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" (click)="closeForm()">Cancel</button>
           <button class="btn btn-primary" (click)="submitLead()" [disabled]="scoring()">
-            @if (scoring()) { <span class="spinner-sm"></span> Scoring with Gemini… } @else { 🚀 Score Lead }
+            @if (scoring()) { <span class="spinner-sm"></span> Analyzing lead… } @else { Save and qualify lead }
           </button>
         </div>
       </div>
@@ -121,7 +121,7 @@
             @for (stage of kanbanStages; track stage) {
               <div class="kanban-column" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:12px;min-width:180px;min-height:550px;">
                 <div class="kanban-column-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px;">
-                  <span style="font-weight:700;font-size:11px;color:var(--text-muted);letter-spacing:0.5px;">{{ stage }}</span>
+                  <span style="font-weight:700;font-size:11px;color:var(--text-muted);letter-spacing:0.5px;">{{ stageLabel(stage) }}</span>
                   <span class="badge" style="font-size:10px;padding:1px 6px;">{{ getLeadsByStage(stage).length }}</span>
                 </div>
 

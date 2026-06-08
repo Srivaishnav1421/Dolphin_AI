@@ -6,6 +6,7 @@ import { Lead } from '../../shared/models';
 
 type Filter = 'ALL' | 'HOT' | 'WARM' | 'COLD' | 'UNQUALIFIABLE';
 type ViewMode = 'LIST' | 'KANBAN';
+type PipelineStage = 'NEW_LEAD' | 'CONTACTED' | 'QUALIFIED' | 'INTERESTED' | 'PROPOSAL_SENT' | 'FOLLOW_UP' | 'NEGOTIATION' | 'CONVERTED' | 'LOST' | 'DORMANT' | 'RECYCLED';
 
 interface InteractionLog {
   id: string;
@@ -42,7 +43,7 @@ export class Leads implements OnInit {
   sendingMessage = signal(false);
 
   filters: Filter[] = ['ALL', 'HOT', 'WARM', 'COLD', 'UNQUALIFIABLE'];
-  kanbanStages = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'WON', 'LOST'];
+  kanbanStages: PipelineStage[] = ['NEW_LEAD', 'CONTACTED', 'QUALIFIED', 'INTERESTED', 'PROPOSAL_SENT', 'FOLLOW_UP', 'NEGOTIATION', 'CONVERTED', 'LOST'];
 
   form = { name: '', message: '', source: 'INSTAGRAM' };
   sources = ['INSTAGRAM', 'FACEBOOK', 'WEBSITE', 'WHATSAPP', 'FORM', 'REFERRAL'];
@@ -97,7 +98,7 @@ export class Leads implements OnInit {
       {
         id: '2',
         type: 'SYSTEM',
-        notes: `Gemini scored lead: ${l.status} with intent tag: ${l.intent_signal || 'Low'}`,
+        notes: `AI scored lead: ${l.status} with intent tag: ${l.intent_signal || 'Low'}`,
         createdAt: new Date(l.created_at)
       }
     ];
@@ -165,14 +166,14 @@ export class Leads implements OnInit {
     this.scoring.set(true);
     this.api.scoreLead(this.form).subscribe({
       next: (scored) => {
-        this.message.set(`✅ Lead scored: ${scored.status} (${(scored.score * 100).toFixed(0)}%)`);
+        this.message.set(`✅ Lead quality: ${scored.status} (${(scored.score * 100).toFixed(0)}%)`);
         this.scoring.set(false);
         this.showForm.set(false);
         this.filter.set('ALL');
         this.load();
         setTimeout(() => this.message.set(''), 4000);
       },
-      error: () => { this.message.set('❌ Scoring failed. Check API.'); this.scoring.set(false); },
+      error: () => { this.message.set('❌ Lead analysis failed. Please try again.'); this.scoring.set(false); },
     });
   }
 
@@ -189,32 +190,22 @@ export class Leads implements OnInit {
   }
 
   // ── Kanban stage mapping helpers ─────────────────────────────────
-  getLeadsByStage(stage: string): Lead[] {
+  getLeadsByStage(stage: PipelineStage): Lead[] {
     const list = this.leads();
     return list.filter(l => {
-      const s = l.status;
-      const sc = l.score || 0.5;
-      if (stage === 'NEW') return s === 'COLD' && sc < 0.4;
-      if (stage === 'CONTACTED') return s === 'COLD' && sc >= 0.4;
-      if (stage === 'QUALIFIED') return s === 'WARM' && sc < 0.6;
-      if (stage === 'PROPOSAL') return s === 'WARM' && sc >= 0.6;
-      if (stage === 'WON') return s === 'HOT';
-      if (stage === 'LOST') return s === 'UNQUALIFIABLE';
-      return false;
+      const leadStage = l.pipeline_stage || this.stageFromStatus(l);
+      return leadStage === stage;
     });
   }
 
-  moveLead(lead: Lead, stage: string) {
-    let targetStatus = 'COLD';
-    let targetScore = lead.score;
-    if (stage === 'NEW') { targetStatus = 'COLD'; targetScore = 0.25; }
-    if (stage === 'CONTACTED') { targetStatus = 'COLD'; targetScore = 0.45; }
-    if (stage === 'QUALIFIED') { targetStatus = 'WARM'; targetScore = 0.55; }
-    if (stage === 'PROPOSAL') { targetStatus = 'WARM'; targetScore = 0.75; }
-    if (stage === 'WON') { targetStatus = 'HOT'; targetScore = 0.95; }
-    if (stage === 'LOST') { targetStatus = 'UNQUALIFIABLE'; targetScore = 0.1; }
+  moveLead(lead: Lead, stage: PipelineStage) {
+    let targetStatus: Lead['status'] = lead.status;
+    if (['NEW_LEAD', 'CONTACTED'].includes(stage)) targetStatus = 'COLD';
+    if (['QUALIFIED', 'INTERESTED', 'PROPOSAL_SENT', 'FOLLOW_UP', 'NEGOTIATION'].includes(stage)) targetStatus = 'WARM';
+    if (stage === 'CONVERTED') targetStatus = 'HOT';
+    if (stage === 'LOST') targetStatus = 'UNQUALIFIABLE';
 
-    this.api.updateLead(lead.id, { status: targetStatus }).subscribe({
+    this.api.updateLead(lead.id, { status: targetStatus, pipeline_stage: stage }).subscribe({
       next: (updated) => {
         this.load();
         if (this.selected()?.id === lead.id) {
@@ -237,6 +228,17 @@ export class Leads implements OnInit {
       return 'Verify requirements via automated email survey.';
     }
     return 'Nurture with low-priority newsletter campaign.';
+  }
+
+  stageFromStatus(lead: Lead): PipelineStage {
+    if (lead.status === 'HOT') return 'INTERESTED';
+    if (lead.status === 'WARM') return 'QUALIFIED';
+    if (lead.status === 'UNQUALIFIABLE') return 'LOST';
+    return 'NEW_LEAD';
+  }
+
+  stageLabel(stage: PipelineStage): string {
+    return stage.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   }
 
   setViewMode(mode: ViewMode) {

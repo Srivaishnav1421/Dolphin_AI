@@ -314,18 +314,72 @@ public class LeadController {
         }
     }
 
-    /** Manually update lead status */
+    /**
+     * Update CRM lead fields safely within the active workspace.
+     * Used by the pipeline board, assignment, follow-up planning, and business profile edits.
+     */
     @PutMapping("/{id}")
-    public ResponseEntity<Lead> update(@PathVariable String id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> update(@PathVariable String id, @RequestBody Map<String, Object> body) {
         Optional<Lead> opt = repo.findById(id);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
-        Lead l = opt.get();
-        if (!l.getWorkspaceId().equals(sec.currentWorkspaceId())) {
-            return ResponseEntity.status(403).build();
+        Lead lead = opt.get();
+        String workspaceId = sec.currentWorkspaceId();
+        if (!workspaceId.equals(lead.getWorkspaceId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Lead does not belong to the active workspace"));
         }
-        if (body.containsKey("status")) l.setStatus(body.get("status"));
-        if (body.containsKey("name"))   l.setName(body.get("name"));
-        return ResponseEntity.ok(repo.save(l));
+
+        String oldStatus = lead.getStatus();
+        String oldStage = lead.getPipelineStage();
+
+        if (body.containsKey("name")) lead.setName(cleanString(body.get("name"), 255));
+        if (body.containsKey("phone")) lead.setPhone(cleanString(body.get("phone"), 50));
+        if (body.containsKey("email")) lead.setEmail(cleanString(body.get("email"), 255));
+        if (body.containsKey("source")) lead.setSource(cleanString(body.get("source"), 80));
+        if (body.containsKey("message")) lead.setMessage(cleanString(body.get("message"), 2000));
+        if (body.containsKey("campaignId")) lead.setCampaignId(cleanString(body.get("campaignId"), 36));
+        if (body.containsKey("campaign_id")) lead.setCampaignId(cleanString(body.get("campaign_id"), 36));
+        if (body.containsKey("assignedUserId")) lead.setAssignedUserId(cleanString(body.get("assignedUserId"), 36));
+        if (body.containsKey("assigned_user_id")) lead.setAssignedUserId(cleanString(body.get("assigned_user_id"), 36));
+        if (body.containsKey("tags")) lead.setTags(cleanString(body.get("tags"), 1000));
+        if (body.containsKey("notes")) lead.setNotes(cleanString(body.get("notes"), 4000));
+        if (body.containsKey("priority")) lead.setPriority(validatePriority(cleanString(body.get("priority"), 30)));
+        if (body.containsKey("budget")) lead.setBudget(toNullableDouble(body.get("budget")));
+        if (body.containsKey("interestCategory")) lead.setInterestCategory(cleanString(body.get("interestCategory"), 255));
+        if (body.containsKey("interest_category")) lead.setInterestCategory(cleanString(body.get("interest_category"), 255));
+        if (body.containsKey("location")) lead.setLocation(cleanString(body.get("location"), 255));
+        if (body.containsKey("conversionProbability")) lead.setConversionProbability(clamp(toNullableDouble(body.get("conversionProbability")), 0.0, 1.0));
+        if (body.containsKey("conversion_probability")) lead.setConversionProbability(clamp(toNullableDouble(body.get("conversion_probability")), 0.0, 1.0));
+        if (body.containsKey("expectedRevenue")) lead.setExpectedRevenue(toNullableDouble(body.get("expectedRevenue")));
+        if (body.containsKey("expected_revenue")) lead.setExpectedRevenue(toNullableDouble(body.get("expected_revenue")));
+        if (body.containsKey("lostReason")) lead.setLostReason(cleanString(body.get("lostReason"), 1000));
+        if (body.containsKey("lost_reason")) lead.setLostReason(cleanString(body.get("lost_reason"), 1000));
+        if (body.containsKey("aiSummary")) lead.setAiSummary(cleanString(body.get("aiSummary"), 4000));
+        if (body.containsKey("ai_summary")) lead.setAiSummary(cleanString(body.get("ai_summary"), 4000));
+        if (body.containsKey("nextBestAction")) lead.setNextBestAction(cleanString(body.get("nextBestAction"), 1000));
+        if (body.containsKey("next_best_action")) lead.setNextBestAction(cleanString(body.get("next_best_action"), 1000));
+        if (body.containsKey("lastContactedAt")) lead.setLastContactedAt(parseDateTime(body.get("lastContactedAt")));
+        if (body.containsKey("last_contacted_at")) lead.setLastContactedAt(parseDateTime(body.get("last_contacted_at")));
+        if (body.containsKey("nextFollowUpAt")) lead.setNextFollowUpAt(parseDateTime(body.get("nextFollowUpAt")));
+        if (body.containsKey("next_follow_up_at")) lead.setNextFollowUpAt(parseDateTime(body.get("next_follow_up_at")));
+
+        if (body.containsKey("status")) {
+            lead.setStatus(validateStatus(cleanString(body.get("status"), 50)));
+        }
+        if (body.containsKey("pipelineStage")) {
+            lead.setPipelineStage(validatePipelineStage(cleanString(body.get("pipelineStage"), 80)));
+        }
+        if (body.containsKey("pipeline_stage")) {
+            lead.setPipelineStage(validatePipelineStage(cleanString(body.get("pipeline_stage"), 80)));
+        }
+
+        Lead saved = repo.save(lead);
+        if ((oldStatus != null && !oldStatus.equals(saved.getStatus())) ||
+                (oldStage != null && !oldStage.equals(saved.getPipelineStage()))) {
+            leadPipelineTrackingService.recordLeadScored(workspaceId, saved.getId(),
+                    "CRM lead updated: status " + oldStatus + " -> " + saved.getStatus() +
+                            ", stage " + oldStage + " -> " + saved.getPipelineStage());
+        }
+        return ResponseEntity.ok(saved);
     }
 
     @DeleteMapping("/{id}")
@@ -436,5 +490,55 @@ public class LeadController {
     private double toDouble(Object v, double def) {
         if (v == null) return def;
         try { return Double.parseDouble(v.toString()); } catch (Exception e) { return def; }
+    }
+
+    private Double toNullableDouble(Object v) {
+        if (v == null || v.toString().isBlank()) return null;
+        try { return Double.parseDouble(v.toString()); } catch (Exception e) { return null; }
+    }
+
+    private Double clamp(Double value, double min, double max) {
+        if (value == null) return null;
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private String cleanString(Object value, int maxLength) {
+        if (value == null) return null;
+        String text = value.toString().trim();
+        if (text.isBlank()) return null;
+        return text.length() <= maxLength ? text : text.substring(0, maxLength);
+    }
+
+    private String validateStatus(String status) {
+        if (status == null) return null;
+        String normalized = status.toUpperCase();
+        return switch (normalized) {
+            case "HOT", "WARM", "COLD", "UNQUALIFIABLE" -> normalized;
+            default -> "COLD";
+        };
+    }
+
+    private String validatePriority(String priority) {
+        if (priority == null) return "MEDIUM";
+        String normalized = priority.toUpperCase();
+        return switch (normalized) {
+            case "LOW", "MEDIUM", "HIGH", "URGENT" -> normalized;
+            default -> "MEDIUM";
+        };
+    }
+
+    private String validatePipelineStage(String stage) {
+        if (stage == null) return "NEW_LEAD";
+        String normalized = stage.toUpperCase().replace(' ', '_');
+        return switch (normalized) {
+            case "NEW_LEAD", "CONTACTED", "QUALIFIED", "INTERESTED", "PROPOSAL_SENT",
+                    "FOLLOW_UP", "NEGOTIATION", "CONVERTED", "LOST", "DORMANT", "RECYCLED" -> normalized;
+            default -> "NEW_LEAD";
+        };
+    }
+
+    private LocalDateTime parseDateTime(Object value) {
+        if (value == null || value.toString().isBlank()) return null;
+        try { return LocalDateTime.parse(value.toString()); } catch (Exception e) { return null; }
     }
 }

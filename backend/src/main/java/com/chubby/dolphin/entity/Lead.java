@@ -21,11 +21,59 @@ public class Lead {
     private String name;
     private String source;       // INSTAGRAM, FACEBOOK, FORM, WHATSAPP, REFERRAL
 
+    @Column(name = "campaign_id", length = 36)
+    private String campaignId;
+
+    @Column(name = "assigned_user_id", length = 36)
+    private String assignedUserId;
+
+    @Column(length = 1000)
+    private String tags;
+
+    @Column(length = 4000)
+    private String notes;
+
     @Column(length = 2000)
     private String message;
 
     private String status;       // HOT, WARM, COLD, UNQUALIFIABLE
+
+    @Column(name = "pipeline_stage", length = 80)
+    private String pipelineStage = "NEW_LEAD";
+
     private Double score;        // 0.0 – 1.0
+
+    @Column(length = 30)
+    private String priority = "MEDIUM";
+
+    private Double budget;
+
+    @Column(name = "interest_category", length = 255)
+    private String interestCategory;
+
+    @Column(length = 255)
+    private String location;
+
+    @Column(name = "last_contacted_at")
+    private LocalDateTime lastContactedAt;
+
+    @Column(name = "next_follow_up_at")
+    private LocalDateTime nextFollowUpAt;
+
+    @Column(name = "conversion_probability")
+    private Double conversionProbability;
+
+    @Column(name = "expected_revenue")
+    private Double expectedRevenue;
+
+    @Column(name = "lost_reason", length = 1000)
+    private String lostReason;
+
+    @Column(name = "ai_summary", length = 4000)
+    private String aiSummary;
+
+    @Column(name = "next_best_action", length = 1000)
+    private String nextBestAction;
 
     private String budgetSignal;
     private String timelineSignal;
@@ -74,14 +122,62 @@ public class Lead {
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
 
+    public String getCampaignId() { return campaignId; }
+    public void setCampaignId(String campaignId) { this.campaignId = campaignId; }
+
+    public String getAssignedUserId() { return assignedUserId; }
+    public void setAssignedUserId(String assignedUserId) { this.assignedUserId = assignedUserId; }
+
+    public String getTags() { return tags; }
+    public void setTags(String tags) { this.tags = tags; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
+    public String getPipelineStage() { return pipelineStage; }
+    public void setPipelineStage(String pipelineStage) { this.pipelineStage = pipelineStage; }
+
     public Double getScore() { return score; }
     public void setScore(Double score) { this.score = score; }
+
+    public String getPriority() { return priority; }
+    public void setPriority(String priority) { this.priority = priority; }
+
+    public Double getBudget() { return budget; }
+    public void setBudget(Double budget) { this.budget = budget; }
+
+    public String getInterestCategory() { return interestCategory; }
+    public void setInterestCategory(String interestCategory) { this.interestCategory = interestCategory; }
+
+    public String getLocation() { return location; }
+    public void setLocation(String location) { this.location = location; }
+
+    public LocalDateTime getLastContactedAt() { return lastContactedAt; }
+    public void setLastContactedAt(LocalDateTime lastContactedAt) { this.lastContactedAt = lastContactedAt; }
+
+    public LocalDateTime getNextFollowUpAt() { return nextFollowUpAt; }
+    public void setNextFollowUpAt(LocalDateTime nextFollowUpAt) { this.nextFollowUpAt = nextFollowUpAt; }
+
+    public Double getConversionProbability() { return conversionProbability; }
+    public void setConversionProbability(Double conversionProbability) { this.conversionProbability = conversionProbability; }
+
+    public Double getExpectedRevenue() { return expectedRevenue; }
+    public void setExpectedRevenue(Double expectedRevenue) { this.expectedRevenue = expectedRevenue; }
+
+    public String getLostReason() { return lostReason; }
+    public void setLostReason(String lostReason) { this.lostReason = lostReason; }
+
+    public String getAiSummary() { return aiSummary; }
+    public void setAiSummary(String aiSummary) { this.aiSummary = aiSummary; }
+
+    public String getNextBestAction() { return nextBestAction; }
+    public void setNextBestAction(String nextBestAction) { this.nextBestAction = nextBestAction; }
 
     public String getBudgetSignal() { return budgetSignal; }
     public void setBudgetSignal(String budgetSignal) { this.budgetSignal = budgetSignal; }
