@@ -1,0 +1,127 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>🔗 Meta Ads Connection</h1>
+      <p>Connect your Meta Business account to manage real ad campaigns autonomously</p>
+    </div>
+    <div style="display:flex;gap:10px">
+      @if (status()?.connected) {
+        <button class="btn btn-ghost" (click)="syncNow()" [disabled]="syncing()">
+          @if (syncing()) { <span class="spinner-sm"></span> Syncing… }
+          @else { 🔄 Sync Now }
+        </button>
+      }
+      <button class="btn btn-primary" (click)="connectMeta()" [disabled]="connecting()">
+        @if (connecting()) { <span class="spinner-sm"></span> Connecting… }
+        @else { 🔗 Connect Meta Account }
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-rows">
+      <div class="skeleton-card" style="height:200px"></div>
+    </div>
+  } @else {
+
+    <!-- Connection Status Card -->
+    <div class="meta-status-card card" [class.meta-status-card--connected]="status()?.connected">
+      <div class="meta-status__header">
+        <div class="meta-status__icon">
+          {{ status()?.connected ? '🟢' : '🔴' }}
+        </div>
+        <div>
+          <h3>{{ status()?.connected ? 'Connected to Meta' : 'Not Connected' }}</h3>
+          @if (status()?.connected) {
+            <p class="meta-status__account">{{ status()?.ad_account_name }} ({{ status()?.ad_account_id }})</p>
+          } @else {
+            <p class="meta-status__hint">Connect your Meta Business Suite to enable autonomous ad management</p>
+          }
+        </div>
+      </div>
+
+      @if (status()?.connected) {
+        <div class="meta-status__details">
+          <div class="meta-detail">
+            <span class="metric-label">Token Status</span>
+            <span class="badge {{ tokenStatusClass(status()?.token_status) }}">{{ status()?.token_status }}</span>
+          </div>
+          <div class="meta-detail">
+            <span class="metric-label">Auto-Manage</span>
+            <span class="badge" [class.active]="status()?.auto_manage_enabled" [class.cold]="!status()?.auto_manage_enabled">
+              {{ status()?.auto_manage_enabled ? 'ENABLED' : 'DISABLED' }}
+            </span>
+          </div>
+          <div class="meta-detail">
+            <span class="metric-label">Facebook Page</span>
+            @if (status()?.meta_page_id) {
+              <span class="badge active">{{ status()?.meta_page_name || status()?.meta_page_id }}</span>
+            } @else {
+              <span class="badge hot" title="Page ID is required for launching ads">⚠️ No Page Linked</span>
+            }
+          </div>
+          <div class="meta-detail">
+            <span class="metric-label">Max Daily Spend</span>
+            <span class="metric-val" style="font-size:18px">₹{{ status()?.max_daily_spend | number:'1.0-0' }}</span>
+          </div>
+          <div class="meta-detail">
+            <span class="metric-label">Last Sync</span>
+            <span style="color:var(--text-secondary);font-size:13px">{{ status()?.last_sync }}</span>
+          </div>
+          <div class="meta-detail">
+            <span class="metric-label">Pause Below ROAS</span>
+            <span class="metric-val" style="font-size:18px">{{ status()?.pause_roas_threshold }}x</span>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- How It Works (when not connected) -->
+    @if (!status()?.connected) {
+      <div class="grid-3" style="margin-top:24px">
+        <div class="card how-step">
+          <div class="how-step__num">1</div>
+          <h4>Create Meta App</h4>
+          <p>Go to <strong>developers.facebook.com</strong> and create a Business app with Marketing API permissions.</p>
+        </div>
+        <div class="card how-step">
+          <div class="how-step__num">2</div>
+          <h4>Connect Account</h4>
+          <p>Click "Connect Meta Account" above. Grant <strong>ads_management</strong> and <strong>leads_retrieval</strong> permissions.</p>
+        </div>
+        <div class="card how-step">
+          <div class="how-step__num">3</div>
+          <h4>Let AI Take Over</h4>
+          <p>Enable Auto-Manage and the Brain AI will <strong>pause, resume, and optimize</strong> your campaigns autonomously.</p>
+        </div>
+      </div>
+    }
+
+    <!-- Connected Account Settings -->
+    @if (connections().length > 0) {
+      <div style="margin-top:24px">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:16px">Connected Accounts</h3>
+        @for (conn of connections(); track conn.id) {
+          <div class="card meta-conn-card">
+            <div class="meta-conn__row">
+              <div>
+                <strong>{{ conn.ad_account_name || conn.meta_ad_account_id }}</strong>
+                <span class="badge {{ tokenStatusClass(conn.token_status) }}" style="margin-left:8px">{{ conn.token_status }}</span>
+              </div>
+              <button class="btn btn-ghost btn-sm" (click)="toggleAutoManage(conn)">
+                {{ conn.auto_manage_enabled ? '🤖 Auto-Manage ON' : '👤 Manual Mode' }}
+              </button>
+            </div>
+            <div class="meta-conn__settings">
+              <span>Currency: {{ conn.currency }}</span>
+              <span>Timezone: {{ conn.timezone }}</span>
+              <span>Max Daily: ₹{{ conn.max_daily_spend | number:'1.0-0' }}</span>
+              <span>Pause ROAS: &lt;{{ conn.pause_roas_threshold }}x</span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+  }
+</div>

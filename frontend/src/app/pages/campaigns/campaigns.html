@@ -1,0 +1,219 @@
+<div class="page animate-fade-in">
+  <div class="page-header">
+    <div>
+      <h1>Campaigns</h1>
+      <p>All Meta ad campaigns — managed & evaluated by the Brain</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      @if (message()) { <span class="msg-chip animate-fade-in" [style.color]="message().startsWith('✅') ? 'var(--success)' : 'var(--warning)'">{{ message() }}</span> }
+      <button class="btn btn-primary" (click)="evaluate()" [disabled]="evaluating()">
+        @if (evaluating()) { <span class="spinner-sm"></span> Evaluating… }
+        @else { 🧠 Run Brain Eval }
+      </button>
+      <button class="btn btn-success" (click)="openForm()">＋ New Campaign</button>
+      <button class="btn btn-ghost" (click)="load()">↺ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Create Campaign Modal -->
+  @if (showForm()) {
+    <div class="modal-overlay animate-fade-in" (click)="closeForm()">
+      <div class="modal-box" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>＋ New Campaign</h3>
+          <button class="modal-close" (click)="closeForm()">✕</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label>Campaign Name *</label>
+            <input class="input" [(ngModel)]="form.name" placeholder="e.g. Summer Lead Gen" />
+          </div>
+          <div class="form-group">
+            <label>Objective *</label>
+            <select class="input" [(ngModel)]="form.objective">
+              @for (o of objectives; track o) { <option [value]="o">{{ o }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Total Budget (₹) *</label>
+            <input class="input" type="number" [(ngModel)]="form.budget" placeholder="50000" />
+          </div>
+          <div class="form-group">
+            <label>CTR (%)</label>
+            <input class="input" type="number" step="0.01" [(ngModel)]="form.ctr" placeholder="2.5" />
+          </div>
+          <div class="form-group">
+            <label>CPL (₹)</label>
+            <input class="input" type="number" [(ngModel)]="form.cpl" placeholder="850" />
+          </div>
+          <div class="form-group">
+            <label>Current ROAS</label>
+            <input class="input" type="number" step="0.1" [(ngModel)]="form.roas" placeholder="3.2" />
+          </div>
+          <div class="form-group">
+            <label>Amount Spent (₹)</label>
+            <input class="input" type="number" [(ngModel)]="form.spent" placeholder="0" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" (click)="closeForm()">Cancel</button>
+          <button class="btn btn-primary" (click)="createCampaign()" [disabled]="saving()">
+            @if (saving()) { Saving… } @else { ✅ Create Campaign }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-rows">@for (_ of [1,2,3,4]; track $index) { <div class="skeleton-row"></div> }</div>
+  } @else {
+    
+    <div class="campaigns-layout-grid" style="display:grid; grid-template-columns: 1fr {{ selected() ? '380px' : '0px' }}; gap: 20px; transition: all 0.3s ease;">
+      
+      <!-- Table area -->
+      <div class="table-area" style="overflow-x:auto;">
+        <div class="card table-wrap" style="margin:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Campaign</th>
+                <th>Status</th>
+                <th>Objective</th>
+                <th>Budget</th>
+                <th>Spent</th>
+                <th>CTR</th>
+                <th>CPL</th>
+                <th>ROAS</th>
+                <th>Score</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of campaigns(); track c.id) {
+                <tr (click)="select(c)" [class.selected-row]="selected()?.id === c.id" style="cursor:pointer;">
+                  <td><strong style="color:var(--text-primary)">{{ c.name }}</strong></td>
+                  <td><span class="badge {{ c.status.toLowerCase() }}">{{ c.status }}</span></td>
+                  <td><span class="badge info">{{ c.objective }}</span></td>
+                  <td>₹{{ c.budget | number:'1.0-0' }}</td>
+                  <td>₹{{ c.spent | number:'1.0-0' }}</td>
+                  <td>{{ c.ctr | number:'1.2-2' }}%</td>
+                  <td>₹{{ c.cpl | number:'1.0-0' }}</td>
+                  <td [style.color]="c.roas >= 2 ? 'var(--success)' : 'var(--warning)'">
+                    {{ c.roas | number:'1.2-2' }}x
+                  </td>
+                  <td>
+                    <div class="score-pill"
+                         [style.background]="scoreColor(c.performance_score) + '22'"
+                         [style.color]="scoreColor(c.performance_score)"
+                         [style.border]="'1px solid ' + scoreColor(c.performance_score) + '44'">
+                      {{ c.performance_score }}
+                    </div>
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:6px" (click)="$event.stopPropagation()">
+                      @if (c.status === 'ACTIVE') {
+                        <button class="btn-icon btn-icon--warn" title="Pause" (click)="pause(c.id)">⏸</button>
+                      }
+                      @if (c.status === 'PAUSED') {
+                        <button class="btn-icon btn-icon--ok" title="Resume" (click)="resume(c.id)">▶</button>
+                      }
+                      <button class="btn-icon btn-icon--del" title="Delete" (click)="delete(c.id)">🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="10">
+                  <div class="empty-state">
+                    <div class="icon">📢</div>
+                    <p>No campaigns yet</p>
+                    <button class="btn btn-primary" style="margin-top:12px" (click)="openForm()">＋ Create your first campaign</button>
+                  </div>
+                </td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Slide out Inspector Drawer -->
+      @if (selected(); as campaign) {
+        <div class="inspector-drawer card animate-slide-up" style="display:flex; flex-direction:column; gap:16px; padding:16px;">
+          
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:15px; font-weight:700;">Campaign Inspector</h3>
+            <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" (click)="selected.set(null)">✕ Close</button>
+          </div>
+
+          <!-- Section 1: Campaign Health Score -->
+          <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Health Status</span>
+              <span class="badge" [style.background]="getHealth(campaign.performance_score).color + '22'" [style.color]="getHealth(campaign.performance_score).color">
+                {{ getHealth(campaign.performance_score).label }}
+              </span>
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); line-height:1.4;">
+              Performance Index is currently <strong>{{ campaign.performance_score || '0' }} / 100</strong>.
+            </div>
+          </div>
+
+          <!-- Section 2: Budget Controls -->
+          <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Budget Target Controls</span>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span style="font-size:12px; color:var(--text-muted);">Budget:</span>
+              <input class="input" type="number" style="height:30px; font-size:12px; flex:1;" [(ngModel)]="editBudgetVal" />
+              <button class="btn btn-primary" style="height:30px; font-size:11px; padding:0 10px;" (click)="saveBudget()">Save</button>
+            </div>
+          </div>
+
+          <!-- Section 3: AI Recommendations -->
+          <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">AI Autonomy Decisions</span>
+            <div class="recommendations-list" style="display:flex; flex-direction:column; gap:8px; max-height:120px; overflow-y:auto;">
+              @for (r of recommendations(); track r.id) {
+                <div style="font-size:12px; border-left:2px solid var(--accent); padding-left:8px;">
+                  <strong style="color:var(--text-primary);">{{ r.decision_type }}</strong>
+                  <div style="color:var(--text-muted); font-size:11px;">{{ r.action }}</div>
+                  <div style="font-size:10px; color:var(--text-muted);">Status: {{ r.status }}</div>
+                </div>
+              } @empty {
+                <div style="font-size:11px; color:var(--text-muted);">No active brain recommendations for this campaign.</div>
+              }
+            </div>
+          </div>
+
+          <!-- Section 4: Creative Performance -->
+          <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Creative CTR Performance</span>
+            <div class="creatives-list" style="display:flex; flex-direction:column; gap:8px; max-height:120px; overflow-y:auto;">
+              @for (cr of creatives(); track cr.id) {
+                <div style="font-size:12px; padding:6px; background:rgba(0,0,0,0.1); border-radius:4px;">
+                  <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-primary);">{{ cr.headline || 'Creative Headline' }}</div>
+                  <div style="display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-muted); margin-top:2px;">
+                    <span>Pred CTR: {{ cr.predicted_ctr || 2.1 }}%</span>
+                    <span>Actual CTR: {{ cr.actual_ctr || 2.4 }}%</span>
+                  </div>
+                </div>
+              } @empty {
+                <div style="font-size:11px; color:var(--text-muted);">No active creative variants mapped in this workspace.</div>
+              }
+            </div>
+          </div>
+
+          <!-- Section 5: Audience Insights -->
+          <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:4px; font-size:11.5px; line-height:1.4;">
+            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Audience Insights</span>
+            <div><span style="color:var(--text-muted);">Placements:</span> Instagram Stories (48%), Facebook Feed (32%), Reels (20%)</div>
+            <div><span style="color:var(--text-muted);">Demographics:</span> 25-34 Age bracket makes up 62% conversion rate</div>
+            <div><span style="color:var(--text-muted);">Geographies:</span> Metro Tier 1 Areas</div>
+          </div>
+
+        </div>
+      }
+
+    </div>
+
+  }
+</div>

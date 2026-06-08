@@ -1,0 +1,147 @@
+@import '../../../styles/design-tokens.scss';
+
+.analytics-page {
+  padding: $spacing-32;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-24;
+  overflow-y: auto;
+  max-width: $max-content-width;
+  margin: 0 auto;
+}
+
+.analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  padding-bottom: $spacing-16;
+}
+
+.analytics-title {
+  font-family: $font-family;
+  font-size: $font-title;
+  font-weight: 700;
+  color: $text-primary;
+  letter-spacing: -0.5px;
+}
+
+.analytics-subtitle {
+  font-family: $font-family;
+  font-size: $font-caption;
+  color: $text-secondary;
+}
+
+.analytics-actions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-12;
+}
+
+.analytics-message {
+  font-family: $font-family;
+  font-size: $font-caption;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: $spacing-24;
+}
+
+.kpi-content {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-4;
+}
+
+.metric-val {
+  font-family: $font-family;
+  font-size: $font-title;
+  font-weight: 700;
+  color: $text-primary;
+}
+
+.emas-hint {
+  font-family: $font-family;
+  font-size: $font-meta;
+  color: $text-muted;
+}
+
+.emas-bar-track {
+  height: 4px;
+  background: $bg-elevated;
+  border-radius: 2px;
+  margin-top: $spacing-8;
+  overflow: hidden;
+  width: 100%;
+}
+
+.emas-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width $transition-normal ease;
+}
+
+.emas-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: $spacing-20;
+}
+
+.emas-summary__item {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-4;
+}
+
+.metric-label {
+  font-family: $font-family;
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-val {
+  font-family: $font-family;
+  font-size: $font-title;
+  font-weight: 800;
+}
+
+.text-accent {
+  color: $accent-primary;
+}
+
+.text-warn {
+  color: $color-warning;
+}
+
+.emas-summary__divider {
+  width: 1px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.skeleton-card {
+  height: 120px;
+  border-radius: $radius-lg;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.08) 37%,
+    rgba(255, 255, 255, 0.03) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

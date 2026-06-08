@@ -1,0 +1,216 @@
+<div class="page animate-fade-in">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>Executive Dashboard</h1>
+      <p>Real-time overview of business performance and growth opportunities.</p>
+    </div>
+    <div class="dash-status">
+      <span class="live-dot"></span>
+      <span class="dash-status__label" [style.color]="wsAlive() ? 'var(--success)' : 'var(--text-muted)'">
+        {{ wsAlive() ? 'System Connected' : 'Connecting to Core…' }}
+      </span>
+      <button class="btn btn-ghost" (click)="loadData()">
+        <span class="material-symbols-outlined font-icon">refresh</span> Refresh
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-grid">
+      @for (_ of [1,2,3,4,5]; track $index) {
+        <div class="skeleton-card"></div>
+      }
+    </div>
+  } @else if (summary(); as s) {
+
+    <!-- Section 1: KPI Stats Cards -->
+    <div class="stats-grid">
+      <!-- Total Revenue -->
+      <div class="stat-card">
+        <div class="stat-card__icon" style="background: rgba(5,150,105,0.08); color: var(--success)">
+          <span class="material-symbols-outlined">trending_up</span>
+        </div>
+        <div>
+          <div class="metric-label">Total Revenue</div>
+          <div class="metric-val">₹{{ s.total_revenue | number:'1.0-0' }}</div>
+        </div>
+      </div>
+
+      <!-- Total Leads -->
+      <div class="stat-card">
+        <div class="stat-card__icon" style="background: rgba(37,99,235,0.08); color: var(--accent)">
+          <span class="material-symbols-outlined">group</span>
+        </div>
+        <div>
+          <div class="metric-label">Total Leads</div>
+          <div class="metric-val">{{ totalLeads() }}</div>
+        </div>
+      </div>
+
+      <!-- Blended ROAS -->
+      <div class="stat-card">
+        <div class="stat-card__icon" style="background: rgba(217,119,6,0.08); color: var(--warning)">
+          <span class="material-symbols-outlined">bolt</span>
+        </div>
+        <div>
+          <div class="metric-label">Blended ROAS</div>
+          <div class="metric-val">{{ s.blended_roas | number:'1.2-2' }}x</div>
+        </div>
+      </div>
+
+      <!-- Active Campaigns -->
+      <div class="stat-card">
+        <div class="stat-card__icon" style="background: rgba(37,99,235,0.08); color: var(--accent)">
+          <span class="material-symbols-outlined">campaign</span>
+        </div>
+        <div>
+          <div class="metric-label">Active Campaigns</div>
+          <div class="metric-val">{{ s.active_campaigns }}</div>
+        </div>
+      </div>
+
+      <!-- Pending Approvals Count -->
+      <div class="stat-card">
+        <div class="stat-card__icon" style="background: rgba(220,38,38,0.08); color: var(--danger)">
+          <span class="material-symbols-outlined">notification_important</span>
+        </div>
+        <div>
+          <div class="metric-label">Pending Approvals</div>
+          <div class="metric-val">{{ recommendations().length }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: AI Brain Summary (Opportunities & Risks) -->
+    <div class="grid-2" style="margin-bottom: 24px;">
+      
+      <!-- Top 3 Opportunities -->
+      <div class="card">
+        <div class="card-header-flex">
+          <h3 class="card-title">💡 Top 3 Growth Opportunities</h3>
+        </div>
+        <div class="recommendations-container">
+          @for (opp of opportunities(); track opp.id) {
+            <div class="decision-box" style="border-left: 3px solid var(--success)">
+              <div class="decision-box-header">
+                <div>
+                  <span class="badge active">{{ opp.decision_type }}</span>
+                  <strong class="campaign-name" style="margin-left: 8px">{{ opp.campaign_name || 'System' }}</strong>
+                </div>
+                <span class="confidence-pct" style="color: var(--success)">
+                  {{ ((opp.confidenceScore || opp.confidence || 0.8) * 100).toFixed(0) }}% Impact
+                </span>
+              </div>
+              <p class="decision-desc">{{ opp.action }}</p>
+            </div>
+          } @empty {
+            <div class="empty-state" style="padding: 20px 0;">
+              <span class="material-symbols-outlined icon">check_circle</span>
+              <p>No growth opportunities at this moment.</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Top 3 Risks -->
+      <div class="card">
+        <div class="card-header-flex">
+          <h3 class="card-title">⚠️ Top 3 Business Risks</h3>
+        </div>
+        <div class="recommendations-container">
+          @for (risk of risks(); track risk.id) {
+            <div class="decision-box" style="border-left: 3px solid var(--danger)">
+              <div class="decision-box-header">
+                <div>
+                  <span class="badge hot">{{ risk.decision_type }}</span>
+                  <strong class="campaign-name" style="margin-left: 8px">{{ risk.campaign_name || 'System' }}</strong>
+                </div>
+                <span class="confidence-pct" style="color: var(--danger)">
+                  {{ ((risk.riskScore || 0.6) * 100).toFixed(0) }}% Risk
+                </span>
+              </div>
+              <p class="decision-desc">{{ risk.action }}</p>
+            </div>
+          } @empty {
+            <div class="empty-state" style="padding: 20px 0;">
+              <span class="material-symbols-outlined icon">check_circle</span>
+              <p>No major risks detected. Health is optimal.</p>
+            </div>
+          }
+        </div>
+      </div>
+      
+    </div>
+
+    <!-- Section 3 & 4: Pending Approvals & Recent Activity -->
+    <div class="grid-2 dash-lower">
+
+      <!-- Section 3: Pending Approvals Actions -->
+      <div class="card decision-card-container">
+        <div class="card-header-flex">
+          <h3 class="card-title">🛡️ Actions Requiring Approval</h3>
+          <span class="badge" [class.hot]="recommendations().length > 0" [class.unqualifiable]="recommendations().length === 0">
+            {{ recommendations().length }} Pending
+          </span>
+        </div>
+
+        <div class="recommendations-container">
+          @for (rec of recommendations(); track rec.id) {
+            <div class="decision-box">
+              <div class="decision-box-header">
+                <div>
+                  <span class="badge warm">{{ rec.decision_type }}</span>
+                  <strong class="campaign-name" style="margin-left: 8px">{{ rec.campaign_name || 'Global System Action' }}</strong>
+                </div>
+                <span class="confidence-pct" [style.color]="confidenceColor(rec.confidence || 0.8)">
+                  {{ ((rec.confidence || 0.8) * 100).toFixed(0) }}% Confidence
+                </span>
+              </div>
+              <p class="decision-desc">{{ rec.action }}</p>
+              @if (rec.reason) {
+                <div class="decision-reason">
+                  <strong>Rationale:</strong> {{ rec.reason }}
+                </div>
+              }
+              <div class="decision-actions">
+                <button class="btn btn-ghost" (click)="rejectDecision(rec.id)">Decline</button>
+                <button class="btn btn-primary" (click)="approveDecision(rec.id)">Approve & Execute</button>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state">
+              <span class="material-symbols-outlined icon">check_circle</span>
+              <p>All AI decisions executed or resolved.</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Section 4: Recent Activity Feed -->
+      <div class="card">
+        <div class="card-header-flex">
+          <h3 class="card-title">⏱️ Recent Activity Feed</h3>
+        </div>
+        <div class="events-list" style="max-height: 400px;">
+          @for (ev of events(); track ev.id) {
+            <div class="event-row animate-fade-in" style="padding: 10px 0;">
+              <span class="badge {{ severityClass(ev.severity) }}" style="font-size: 9px; padding: 2px 6px; min-width: 65px; text-align: center; display: inline-block;">
+                {{ ev.event_type || ev.severity }}
+              </span>
+              <span class="event-msg" style="margin-left: 8px;">{{ ev.message }}</span>
+              <span class="event-time">{{ ev.created_at | date:'mediumTime' }}</span>
+            </div>
+          } @empty {
+            <div class="empty-state" style="padding: 40px 20px;">
+              <p>No activity log recorded in this session.</p>
+            </div>
+          }
+        </div>
+      </div>
+
+    </div>
+  }
+
+</div>

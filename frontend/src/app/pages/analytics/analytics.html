@@ -1,0 +1,97 @@
+<div class="analytics-page">
+  <header class="analytics-header">
+    <div class="analytics-header__title-section">
+      <h1 class="analytics-title">Analytics</h1>
+      <p class="analytics-subtitle">EMAS enterprise metrics — Blended ROAS, CAC, MER</p>
+    </div>
+    <div class="analytics-actions">
+      <span *ngIf="message()" class="analytics-message"
+            [style.color]="message().startsWith('✅') ? 'var(--success)' : 'var(--danger)'">
+        {{ message() }}
+      </span>
+      <button class="btn btn-primary" (click)="runArbitrage()" [disabled]="running()">
+        <span *ngIf="running()">⚙️ Running…</span>
+        <span *ngIf="!running()">⚡ Run Arbitrage</span>
+      </button>
+      <button class="btn btn-ghost" (click)="load()">↺</button>
+    </div>
+  </header>
+
+  <ng-container *ngIf="loading()">
+    <div class="stats-grid">
+      <div *ngFor="let _ of [1,2,3,4,5]" class="skeleton-card"></div>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="!loading() && metrics() as m">
+    <!-- Top KPI cards using UiPanel components -->
+    <div class="stats-grid">
+      
+      <ui-panel title="Blended ROAS" elevation="surface" padding="16px">
+        <div class="kpi-content">
+          <div class="metric-val" [style.color]="roasHealth(m.blended_roas)">{{ m.blended_roas | number:'1.2-2' }}x</div>
+          <div class="emas-hint">Target: ≥ 3.0x</div>
+          <div class="emas-bar-track">
+            <div class="emas-bar-fill" [style.width.%]="(m.blended_roas / 5) * 100" [style.background]="roasHealth(m.blended_roas)"></div>
+          </div>
+        </div>
+      </ui-panel>
+
+      <ui-panel title="CAC" elevation="surface" padding="16px">
+        <div class="kpi-content">
+          <div class="metric-val">₹{{ m.cac | number:'1.0-0' }}</div>
+          <div class="emas-hint">Cost per new customer</div>
+        </div>
+      </ui-panel>
+
+      <ui-panel title="MER" elevation="surface" padding="16px">
+        <div class="kpi-content">
+          <div class="metric-val" [style.color]="merHealth(m.mer)">{{ m.mer | number:'1.2-2' }}x</div>
+          <div class="emas-hint">Marketing Efficiency Ratio</div>
+          <div class="emas-bar-track">
+            <div class="emas-bar-fill" [style.width.%]="(m.mer / 6) * 100" [style.background]="merHealth(m.mer)"></div>
+          </div>
+        </div>
+      </ui-panel>
+
+      <ui-panel title="Total Spend" elevation="surface" padding="16px">
+        <div class="kpi-content">
+          <div class="metric-val">₹{{ m.total_spend | number:'1.0-0' }}</div>
+          <div class="emas-hint">All campaigns combined</div>
+        </div>
+      </ui-panel>
+
+      <ui-panel title="Total Revenue" elevation="surface" padding="16px">
+        <div class="kpi-content">
+          <div class="metric-val" style="color:var(--success)">₹{{ m.total_revenue | number:'1.0-0' }}</div>
+          <div class="emas-hint">Attributed to ads</div>
+        </div>
+      </ui-panel>
+
+    </div>
+
+    <!-- Summary row panel -->
+    <ui-panel title="Marketing Summary Insights" elevation="elevated">
+      <div class="emas-summary">
+        <div class="emas-summary__item">
+          <div class="metric-label">Total Customers</div>
+          <div class="summary-val text-accent">{{ m.total_customers }}</div>
+        </div>
+        <div class="emas-summary__divider"></div>
+        <div class="emas-summary__item">
+          <div class="metric-label">Blended Profit</div>
+          <div class="summary-val" [style.color]="(m.total_revenue - m.total_spend) >= 0 ? 'var(--success)' : 'var(--danger)'">
+            ₹{{ (m.total_revenue - m.total_spend) | number:'1.0-0' }}
+          </div>
+        </div>
+        <div class="emas-summary__divider"></div>
+        <div class="emas-summary__item">
+          <div class="metric-label">Spend / Revenue Ratio</div>
+          <div class="summary-val text-warn">
+            {{ (m.total_spend / m.total_revenue * 100) | number:'1.0-0' }}%
+          </div>
+        </div>
+      </div>
+    </ui-panel>
+  </ng-container>
+</div>

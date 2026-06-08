@@ -1,0 +1,297 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>🧠 Ad Brain — Decision Engine</h1>
+      <p>Autonomous campaign evaluation with safety guardrails and approval workflow</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="brain-status" [class.brain-status--live]="wsAlive()">
+        <span class="live-dot"></span>
+        {{ wsAlive() ? 'Brain Online' : 'Polling…' }}
+      </div>
+      <button class="btn btn-secondary" (click)="evaluate()" [disabled]="evaluating()">
+        @if (evaluating()) { 🧠 Evaluating… } @else { 🔍 Run Brain Evaluation }
+      </button>
+      <button class="btn btn-primary" (click)="runArbitrage()" [disabled]="running()">
+        @if (running()) { ⚙️ Running… } @else { ⚡ Run Arbitrage }
+      </button>
+      <button class="btn btn-ghost" (click)="load()">↺</button>
+    </div>
+  </div>
+
+  <!-- LLM Status Bar -->
+  @if (llmStatus(); as llm) {
+    <div class="llm-status-bar">
+      <div class="llm-provider" [class.llm-provider--active]="llm.active_provider === 'OLLAMA'">
+        <span class="llm-provider__dot"></span>
+        <span>Ollama ({{ llm.ollama.model }})</span>
+        <span class="badge" [class.active]="llm.ollama.available" [class.cold]="!llm.ollama.available">
+          {{ llm.ollama.available ? 'ONLINE' : 'OFFLINE' }}
+        </span>
+      </div>
+      <div class="llm-provider" [class.llm-provider--active]="llm.active_provider === 'GEMINI'">
+        <span class="llm-provider__dot"></span>
+        <span>Gemini Pro</span>
+        <span class="badge active">READY</span>
+      </div>
+      <div class="llm-active-label">
+        Active: <strong>{{ llm.active_provider }}</strong>
+      </div>
+    </div>
+  }
+
+  <!-- Closed Loop Telemetry Dashboard -->
+  @if (analytics(); as ana) {
+    <div class="closed-loop-dashboard animate-fade-in">
+      <div class="telemetry-card revenue">
+        <div class="telemetry-card__header">
+          <span class="telemetry-card__icon">💰</span>
+          <span class="telemetry-card__title">Total Revenue Impact</span>
+        </div>
+        <div class="telemetry-card__value">₹{{ ana.revenueImpact | number:'1.0-2' }}</div>
+        <div class="telemetry-card__trend">🏆 +{{ ana.experimentWinRate }}% Exploration Wins</div>
+      </div>
+
+      <div class="telemetry-card savings">
+        <div class="telemetry-card__header">
+          <span class="telemetry-card__icon">🛡️</span>
+          <span class="telemetry-card__title">Spend Budget Saved</span>
+        </div>
+        <div class="telemetry-card__value">₹{{ ana.spendSaved | number:'1.0-2' }}</div>
+        <div class="telemetry-card__trend">⚡ Active Safety Guards</div>
+      </div>
+
+      <div class="telemetry-card loop">
+        <div class="telemetry-card__header">
+          <span class="telemetry-card__icon">🧠</span>
+          <span class="telemetry-card__title">MAB Learning Confidence</span>
+        </div>
+        <div class="telemetry-card__value">{{ ana.learningConfidence }}%</div>
+        <div class="telemetry-card__trend">🎯 Exploration / Exploitation</div>
+      </div>
+
+      <div class="telemetry-card governance">
+        <div class="telemetry-card__header">
+          <span class="telemetry-card__icon">🛡️</span>
+          <span class="telemetry-card__title">Safety Governance Index</span>
+        </div>
+        <div class="telemetry-card__value" [style.color]="ana.governanceScore > 75 ? 'var(--success)' : 'var(--warning)'">
+          {{ ana.governanceScore }}/100
+        </div>
+        <div class="telemetry-card__trend">🚀 No Policy Violations</div>
+      </div>
+    </div>
+  }
+
+  <!-- 4-Tab Navigation Selector -->
+  <div class="brain-tabs">
+    <button class="brain-tab" [class.brain-tab--active]="activeTab() === 'OPPORTUNITIES'" (click)="setTab('OPPORTUNITIES')">
+      💡 Opportunities
+      @if (opportunities().length > 0) {
+        <span class="brain-tab__badge" style="background:var(--primary);color:#fff;">{{ opportunities().length }}</span>
+      }
+    </button>
+    <button class="brain-tab" [class.brain-tab--active]="activeTab() === 'RISKS'" (click)="setTab('RISKS')">
+      ⚠️ Risks & Safety
+      @if (risks().length > 0) {
+        <span class="brain-tab__badge" style="background:var(--danger);color:#fff;">{{ risks().length }}</span>
+      }
+    </button>
+    <button class="brain-tab" [class.brain-tab--active]="activeTab() === 'APPROVALS'" (click)="setTab('APPROVALS')">
+      ⏳ Approval Queue
+      @if (approvals().length > 0) {
+        <span class="brain-tab__badge" style="background:var(--warning);color:#000;">{{ approvals().length }}</span>
+      }
+    </button>
+    <button class="brain-tab" [class.brain-tab--active]="activeTab() === 'HISTORY'" (click)="setTab('HISTORY')">
+      📜 Decision History
+    </button>
+  </div>
+
+  <div class="brain-content">
+
+    <!-- Tab 1: Opportunities -->
+    @if (activeTab() === 'OPPORTUNITIES') {
+      <div class="decisions-list">
+        @for (d of opportunities(); track d.id) {
+          <div class="decision-card animate-slide-up" style="border-left: 3px solid var(--primary);">
+            <div class="decision-card__header">
+              <div class="decision-card__campaign">
+                <strong>{{ d.campaign_name || 'Account-wide Opportunity' }}</strong>
+                <span class="badge active" style="font-size:10px;">GROWTH ACTION</span>
+              </div>
+              <div style="display:flex; gap:12px; align-items:center">
+                <div class="decision-card__confidence" [style.color]="confidenceColor(d.confidenceScore || d.confidence || 0.85)">
+                  🎯 {{ ((d.confidenceScore || d.confidence || 0.85) * 100) | number:'1.0-0' }}% confidence
+                </div>
+              </div>
+            </div>
+            
+            <div class="decision-card__body">
+              <div class="decision-card__action" style="font-size:14px; font-weight:600; margin-bottom:8px; color:var(--text-primary);">
+                {{ d.decision_type }}: {{ d.reason || d.action }}
+              </div>
+              
+              <div class="explainability-panel" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:6px; margin:10px 0; font-size:11px">
+                <div style="margin-bottom:4px">📡 <strong>Trigger Metrics:</strong> <span style="color:var(--text-muted)">{{ d.triggerMetrics || 'ROAS=' + (d.roasAtDecision || '0.0') + ', Spent=' + (d.spentAtDecision || '0.0') }}</span></div>
+                <div>🚨 <strong>Threshold Breached:</strong> <span style="color:var(--warning)">{{ d.thresholdBreached || 'NONE' }}</span></div>
+              </div>
+
+              @if (d.budget_before && d.budget_after) {
+                <div class="decision-card__budget" style="font-size:12.5px; font-weight:500; color:var(--text-secondary);">
+                  Proposed Budget: ₹{{ d.budget_before | number:'1.0-0' }} → ₹{{ d.budget_after | number:'1.0-0' }}
+                </div>
+              }
+            </div>
+
+            <div class="decision-card__actions" style="margin-top:12px; display:flex; gap:8px;">
+              <button class="btn btn-success btn-sm" (click)="approveDecision(d.id)">✅ Approve & Deploy</button>
+              <button class="btn btn-danger btn-sm" (click)="rejectDecision(d.id)">❌ Dismiss</button>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="icon">💡</div>
+            <p>No growth opportunities found in this cycle. Brain is scanning metrics…</p>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Tab 2: Risks & Safety -->
+    @if (activeTab() === 'RISKS') {
+      <div class="decisions-list">
+        @for (d of risks(); track d.id) {
+          <div class="decision-card animate-slide-up" style="border-left: 3px solid var(--danger);">
+            <div class="decision-card__header">
+              <div class="decision-card__campaign">
+                <strong>{{ d.campaign_name || 'Account-wide Risk warning' }}</strong>
+                <span class="badge warm" style="font-size:10px;">SAFETY WATCH</span>
+              </div>
+              <div style="display:flex; gap:12px; align-items:center">
+                @if (d.riskScore !== undefined) {
+                  <span class="badge" style="background:rgba(235, 87, 87, 0.15); color:#eb5757">
+                    ⚠️ Risk Score: {{ (d.riskScore * 100) | number:'1.0-0' }}%
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div class="decision-card__body">
+              <div class="decision-card__action" style="font-size:14px; font-weight:600; margin-bottom:8px; color:var(--danger);">
+                {{ d.decision_type }}: {{ d.reason || d.action }}
+              </div>
+
+              <div class="explainability-panel" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:6px; margin:10px 0; font-size:11px">
+                <div style="margin-bottom:4px">📡 <strong>Trigger Metrics:</strong> <span style="color:var(--text-muted)">{{ d.triggerMetrics || 'ROAS=' + (d.roasAtDecision || '0.0') + ', Spent=' + (d.spentAtDecision || '0.0') }}</span></div>
+                <div>🚨 <strong>Safety Rule Violation:</strong> <span style="color:#eb5757; font-weight:bold;">{{ d.thresholdBreached || 'LOW_PERFORMANCE_LIMIT' }}</span></div>
+              </div>
+            </div>
+
+            <div class="decision-card__actions" style="margin-top:12px; display:flex; gap:8px;">
+              <button class="btn btn-danger btn-sm" (click)="approveDecision(d.id)">🛡️ Apply Mitigation</button>
+              <button class="btn btn-ghost btn-sm" (click)="rejectDecision(d.id)">Ignore Warning</button>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="icon">🛡️</div>
+            <p>All clean. No budget leaks, toxic ad placements, or fatigue anomalies detected.</p>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Tab 3: Approval Queue -->
+    @if (activeTab() === 'APPROVALS') {
+      <div class="decisions-list">
+        @for (d of approvals(); track d.id) {
+          <div class="decision-card decision-card--pending animate-slide-up">
+            <div class="decision-card__header">
+              <div class="decision-card__campaign">
+                <strong>{{ d.campaign_name || 'Account-wide Action' }}</strong>
+                <span class="badge warm">NEEDS APPROVAL</span>
+              </div>
+              <div style="display:flex; gap:12px; align-items:center">
+                <div class="decision-card__confidence" [style.color]="confidenceColor(d.confidenceScore || d.confidence || 0.85)">
+                  🎯 {{ ((d.confidenceScore || d.confidence || 0.85) * 100) | number:'1.0-0' }}% confidence
+                </div>
+              </div>
+            </div>
+            
+            <div class="decision-card__body">
+              <div class="decision-card__action" style="font-size:14px; font-weight:600; margin-bottom:8px; color:var(--text-primary);">
+                {{ d.decision_type }}: {{ d.reason || d.action }}
+              </div>
+
+              <div class="explainability-panel" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:6px; margin:10px 0; font-size:11px">
+                <div style="margin-bottom:4px">📡 <strong>Trigger Metrics:</strong> <span style="color:var(--text-muted)">{{ d.triggerMetrics || 'ROAS=' + (d.roasAtDecision || '0.0') + ', Spent=' + (d.spentAtDecision || '0.0') }}</span></div>
+                <div>🚨 <strong>Threshold Breached:</strong> <span style="color:#f2c94c">{{ d.thresholdBreached || 'NONE' }}</span></div>
+              </div>
+
+              @if (d.budget_before && d.budget_after) {
+                <div class="decision-card__budget" style="font-size:12.5px;">
+                  Budget delta: ₹{{ d.budget_before | number:'1.0-0' }} → ₹{{ d.budget_after | number:'1.0-0' }}
+                </div>
+              }
+            </div>
+
+            <div class="decision-card__actions" style="margin-top:12px; display:flex; gap:8px;">
+              <button class="btn btn-success btn-sm" (click)="approveDecision(d.id)">✅ Approve & Execute</button>
+              <button class="btn btn-danger btn-sm" (click)="rejectDecision(d.id)">❌ Reject</button>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="icon">✅</div>
+            <p>Approval queue is empty. All autonomous activities are synchronized.</p>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Tab 4: Decision History -->
+    @if (activeTab() === 'HISTORY') {
+      <div class="decisions-list">
+        @for (d of history(); track d.id) {
+          <div class="decision-card animate-slide-up" style="position:relative">
+            <div class="decision-card__header">
+              <div class="decision-card__campaign">
+                <strong>{{ d.campaign_name || 'Account-wide' }}</strong>
+                <span class="badge {{ decisionClass(d.status) }}">{{ d.status }}</span>
+              </div>
+              <div style="display:flex; gap:12px; align-items:center">
+                <span class="decision-card__time" style="color:var(--text-muted); font-size:11px;">{{ d.created_at || d.createdAt | date:'MMM d, HH:mm' }}</span>
+              </div>
+            </div>
+
+            <div class="decision-card__body">
+              <div class="decision-card__action" style="font-size:13.5px; font-weight:500; margin-bottom:8px">
+                {{ d.decision_type }}: {{ d.reason || d.action }}
+              </div>
+
+              <div class="explainability-panel" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:10px; border-radius:6px; margin:10px 0; font-size:11px">
+                <div>📡 <strong>Trigger Metrics:</strong> <span style="color:var(--text-muted)">{{ d.triggerMetrics || 'ROAS=' + (d.roasAtDecision || '0.0') + ', Spent=' + (d.spentAtDecision || '0.0') }}</span></div>
+              </div>
+            </div>
+
+            <div class="decision-card__footer" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:10px; margin-top:10px;">
+              <span class="decision-card__provider" style="font-size:11px; color:var(--text-muted);">Executor: {{ d.llm_provider || 'SAFETY_RULES_ENGINE' }}</span>
+              @if (d.status === 'EXECUTED' || d.status === 'AUTO_EXECUTED' || d.status === 'APPROVED') {
+                <button class="btn btn-ghost btn-sm" (click)="rollbackDecision(d.id)" style="font-size:10.5px; padding:4px 8px; border:1px solid var(--border);">
+                  🔄 Rollback State
+                </button>
+              }
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="icon">📜</div>
+            <p>No historical decisions recorded.</p>
+          </div>
+        }
+      </div>
+    }
+
+  </div>
+</div>

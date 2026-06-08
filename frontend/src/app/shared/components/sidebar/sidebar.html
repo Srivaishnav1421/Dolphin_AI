@@ -1,0 +1,59 @@
+<aside class="sidebar">
+
+  <!-- Logo -->
+  <div class="sidebar__logo">
+    <div class="sidebar__logo-icon">🐬</div>
+    <div class="sidebar__logo-text">
+      <span class="sidebar__logo-name">DolphinAI</span>
+      <span class="sidebar__logo-tag">Enterprise AI</span>
+    </div>
+  </div>
+
+  <!-- Status Indicator -->
+  <div class="sidebar__status">
+    <div class="sidebar__status-row">
+      <span class="sidebar__status-dot" [class.sidebar__status-dot--active]="metaConnected()"></span>
+      <span class="sidebar__status-label">Meta {{ metaConnected() ? 'Connected' : 'Disconnected' }}</span>
+    </div>
+    <div class="sidebar__status-row">
+      <span class="sidebar__status-dot sidebar__status-dot--ai"></span>
+      <span class="sidebar__status-label">LLM: {{ llmProvider() }}</span>
+    </div>
+    @if (pendingCount() > 0) {
+      <div class="sidebar__pending-badge">
+        {{ pendingCount() }} pending approval{{ pendingCount() > 1 ? 's' : '' }}
+      </div>
+    }
+  </div>
+
+  <!-- Nav -->
+  <nav class="sidebar__nav">
+    @for (item of navItems; track item.path) {
+      <a
+        class="sidebar__link"
+        [routerLink]="item.path"
+        routerLinkActive="sidebar__link--active"
+      >
+        <span class="sidebar__link-icon">{{ item.icon }}</span>
+        <span class="sidebar__link-label">{{ item.label }}</span>
+        @if (item.label === 'Ad Brain' && pendingCount() > 0) {
+          <span class="sidebar__badge">{{ pendingCount() }}</span>
+        }
+        <span class="sidebar__link-indicator"></span>
+      </a>
+    }
+  </nav>
+
+  <!-- Footer -->
+  <div class="sidebar__footer">
+    <div class="sidebar__user">
+      <div class="sidebar__avatar">{{ auth.currentUser()?.name?.[0] ?? 'U' }}</div>
+      <div class="sidebar__user-info">
+        <span class="sidebar__user-name">{{ auth.currentUser()?.name ?? 'User' }}</span>
+        <span class="sidebar__user-role">{{ auth.currentUser()?.role ?? 'Agent' }}</span>
+      </div>
+    </div>
+    <button class="sidebar__logout" (click)="logout()">⏏</button>
+  </div>
+
+</aside>

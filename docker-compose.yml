@@ -1,0 +1,157 @@
+# ══════════════════════════════════════════════════════════════
+#  DolphinAI — docker-compose.yml
+#  Run: docker-compose up -d
+#  Full stack: Backend + Frontend + PostgreSQL + Redis + Ollama
+# ══════════════════════════════════════════════════════════════
+
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL Database ────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: dolphin_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       dolphindb
+      POSTGRES_USER:     dolphin
+      POSTGRES_PASSWORD: dolphin123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dolphin -d dolphindb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis Cache ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: dolphin_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── Ollama (Local LLM — Mistral 7B) ───────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dolphin_ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Spring Boot Backend ────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dolphin_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE:     prod
+      SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/dolphindb
+      SPRING_DATASOURCE_USERNAME: dolphin
+      SPRING_DATASOURCE_PASSWORD: dolphin123
+      REDIS_HOST:                 redis
+      REDIS_PORT:                 6379
+      OLLAMA_BASE_URL:            http://ollama:11434
+      OLLAMA_MODEL:               ${OLLAMA_MODEL:-mistral:7b-instruct-v0.3-q4_K_M}
+      OLLAMA_ENABLED:             "true"
+      GEMINI_API_KEY:             ${GEMINI_API_KEY}
+      META_APP_ID:                ${META_APP_ID:-}
+      META_APP_SECRET:            ${META_APP_SECRET:-}
+      META_REDIRECT_URI:          ${META_REDIRECT_URI:-http://localhost:4200/meta/callback}
+      META_WEBHOOK_VERIFY_TOKEN:  ${META_WEBHOOK_VERIFY_TOKEN:-dolphin_verify_2026}
+      RAZORPAY_KEY_ID:            ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET:        ${RAZORPAY_KEY_SECRET}
+      MAIL_USER:                  ${MAIL_USER:-}
+      MAIL_PASS:                  ${MAIL_PASS:-}
+      ALERT_EMAIL:                ${ALERT_EMAIL:-admin@dolphin.ai}
+      ALERTS_ENABLED:             ${ALERTS_ENABLED:-false}
+      REPORTS_ENABLED:            ${REPORTS_ENABLED:-false}
+      OPENAI_API_KEY:             ${OPENAI_API_KEY:-}
+      META_ENCRYPTION_KEY:        ${META_ENCRYPTION_KEY:-dolphin_encryption_key_32chars_min_required!!}
+      JWT_SECRET:                 ${JWT_SECRET:-DolphinAI_SuperSecretKey_2026_HS256_MinLength32BytesRequired!!}
+      HF_TOKEN:                   ${HF_TOKEN:-}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Angular Frontend (Nginx) ──────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dolphin_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+  # ── n8n Workflow Automation ──────────────────────────────────
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: dolphin_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=dolphindb
+      - DB_POSTGRESDB_USER=dolphin
+      - DB_POSTGRESDB_PASSWORD=dolphin123
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-dolphin123}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-dolphin_n8n_encryption_key_32chars}
+      - N8N_PORT=5678
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+# ── Volumes ────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+  n8n_data:
+    driver: local

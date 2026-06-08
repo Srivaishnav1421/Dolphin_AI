@@ -1,0 +1,219 @@
+[
+  {
+    "name": "DolphinAI Main Workflow",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "execute",
+          "options": {}
+        },
+        "id": "webhook-trigger-node",
+        "name": "Webhook Trigger",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 300]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://backend:8000/api/workflow/event",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"executionId\": \"{{$json.body.executionId}}\",\n  \"eventType\": \"WORKFLOW_STARTED\",\n  \"message\": \"Workflow execution started inside n8n\",\n  \"details\": {}\n}",
+          "options": {}
+        },
+        "id": "notify-started-node",
+        "name": "Notify Workflow Started",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [450, 300]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "type": "mix"
+            },
+            "conditions": [
+              {
+                "id": "is-chat",
+                "leftValue": "={{$json.body.message.toLowerCase()}}",
+                "transition": "contains",
+                "rightValue": "chat"
+              }
+            ],
+            "combinator": "or"
+          },
+          "options": {}
+        },
+        "id": "router-node",
+        "name": "Select Agent",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [650, 300]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://backend:8000/api/workflow/event",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"executionId\": \"{{$node[\"Webhook Trigger\"].json.body.executionId}}\",\n  \"eventType\": \"AGENT_SELECTED\",\n  \"message\": \"ChatAgent selected to handle request\",\n  \"details\": {\"agent\": \"ChatAgent\"}\n}",
+          "options": {}
+        },
+        "id": "notify-chat-selected-node",
+        "name": "Notify Chat Agent Selected",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [850, 200]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://backend:8000/api/agents/run",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"agentType\": \"CHAT_AGENT\",\n  \"message\": \"{{$node[\"Webhook Trigger\"].json.body.message}}\",\n  \"traceId\": \"{{$node[\"Webhook Trigger\"].json.body.traceId}}\"\n}",
+          "options": {}
+        },
+        "id": "run-chat-agent-node",
+        "name": "Execute Chat Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [1050, 200]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://backend:8000/api/workflow/event",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"executionId\": \"{{$node[\"Webhook Trigger\"].json.body.executionId}}\",\n  \"eventType\": \"AGENT_SELECTED\",\n  \"message\": \"ResearchAgent selected to handle request\",\n  \"details\": {\"agent\": \"ResearchAgent\"}\n}",
+          "id": "notify-research-selected-node",
+          "name": "Notify Research Agent Selected",
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 4,
+          "position": [850, 400]
+        },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://backend:8000/api/agents/run",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"agentType\": \"RESEARCH_AGENT\",\n  \"message\": \"{{$node[\"Webhook Trigger\"].json.body.message}}\",\n  \"traceId\": \"{{$node[\"Webhook Trigger\"].json.body.traceId}}\"\n}",
+          "options": {}
+        },
+        "id": "run-research-agent-node",
+        "name": "Execute Research Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [1050, 400]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://backend:8000/api/workflow/event",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"executionId\": \"{{$node[\"Webhook Trigger\"].json.body.executionId}}\",\n  \"eventType\": \"WORKFLOW_COMPLETED\",\n  \"message\": \"Orchestration workflow finished successfully\",\n  \"details\": {\n    \"response\": \"{{$json.response}}\",\n    \"agentUsed\": \"{{$json.agentUsed}}\"\n  }\n}",
+          "options": {}
+        },
+        "id": "notify-complete-node",
+        "name": "Notify Workflow Complete",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [1300, 300]
+      }
+    ],
+    "connections": {
+      "Webhook Trigger": {
+        "main": [
+          [
+            {
+              "node": "Notify Workflow Started",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notify Workflow Started": {
+        "main": [
+          [
+            {
+              "node": "Select Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Select Agent": {
+        "main": [
+          [
+            {
+              "node": "Notify Chat Agent Selected",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Notify Research Agent Selected",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notify Chat Agent Selected": {
+        "main": [
+          [
+            {
+              "node": "Execute Chat Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Chat Agent": {
+        "main": [
+          [
+            {
+              "node": "Notify Workflow Complete",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notify Research Agent Selected": {
+        "main": [
+          [
+            {
+              "node": "Execute Research Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Research Agent": {
+        "main": [
+          [
+            {
+              "node": "Notify Workflow Complete",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+]

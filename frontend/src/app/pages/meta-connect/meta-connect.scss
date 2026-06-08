@@ -1,0 +1,77 @@
+/* Meta Status Card */
+.meta-status-card {
+  padding: 28px;
+  &--connected { border-color: rgba(16,185,129,0.3); }
+}
+.meta-status__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  h3 { font-size: 18px; font-weight: 700; }
+}
+.meta-status__icon { font-size: 28px; }
+.meta-status__account {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.meta-status__hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.meta-status__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.meta-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* How It Works Steps */
+.how-step {
+  text-align: center;
+  padding: 32px 24px;
+  h4 { font-size: 15px; font-weight: 700; margin-bottom: 10px; color: var(--text-primary); }
+  p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+}
+.how-step__num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan), var(--indigo));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+/* Connection Card */
+.meta-conn-card {
+  margin-bottom: 12px;
+  padding: 18px;
+}
+.meta-conn__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  strong { font-size: 14px; color: var(--text-primary); }
+}
+.meta-conn__settings {
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.btn-sm { padding: 5px 12px; font-size: 11px; }

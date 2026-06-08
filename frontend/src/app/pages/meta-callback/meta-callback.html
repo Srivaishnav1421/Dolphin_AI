@@ -1,0 +1,18 @@
+<div class="callback-container">
+  <div class="glass-card">
+    @if (status() === 'loading') {
+      <div class="status-icon loading-spin">🔄</div>
+      <h2>Connecting to Meta...</h2>
+      <p class="subtitle">Please wait while we secure your authorization token and sync your ad account details.</p>
+    } @else if (status() === 'success') {
+      <div class="status-icon success-tick">🟢</div>
+      <h2>Connection Successful!</h2>
+      <p class="subtitle">Your Meta Business suite is now linked. This window will close automatically.</p>
+    } @else {
+      <div class="status-icon error-cross">❌</div>
+      <h2>Connection Failed</h2>
+      <p class="subtitle error-text">{{ errorMsg() }}</p>
+      <button class="btn btn-primary" (click)="closePopup()">Close Window</button>
+    }
+  </div>
+</div>

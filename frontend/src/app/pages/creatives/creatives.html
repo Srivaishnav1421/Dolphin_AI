@@ -1,0 +1,311 @@
+<div class="page animate-fade-in">
+  
+  <div class="page-header">
+    <div>
+      <h1>✍️ Creative AI Studio</h1>
+      <p>AI-powered copy generation, multi-channel templates, and competitor inspired briefs</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      @if (launchMessage()) {
+        <span class="msg-chip animate-fade-in" style="color:var(--success);font-weight:bold;font-size:12.5px">{{ launchMessage() }}</span>
+      }
+      <button class="btn btn-ghost" (click)="load()">↺ Refresh Assets</button>
+    </div>
+  </div>
+
+  <div class="studio-container" style="display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start;">
+    
+    <!-- Left Navigation Sidebar for Studio Generators -->
+    <div class="studio-sidebar" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+      <h3 style="margin-top:0;margin-bottom:12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Generators</h3>
+      
+      <button class="btn studio-nav-btn" [class.active-nav]="selectedTab() === 'AD_COPY'" (click)="setTab('AD_COPY')">
+        <span class="material-symbols-outlined font-icon" style="font-size:18px;margin-right:6px;">campaign</span> Ad Copy Generator
+      </button>
+
+      <button class="btn studio-nav-btn" [class.active-nav]="selectedTab() === 'SOCIAL'" (click)="setTab('SOCIAL')">
+        <span class="material-symbols-outlined font-icon" style="font-size:18px;margin-right:6px;">share</span> Social Post Generator
+      </button>
+
+      <button class="btn studio-nav-btn" [class.active-nav]="selectedTab() === 'WHATSAPP'" (click)="setTab('WHATSAPP')">
+        <span class="material-symbols-outlined font-icon" style="font-size:18px;margin-right:6px;">chat</span> WhatsApp Campaigns
+      </button>
+
+      <button class="btn studio-nav-btn" [class.active-nav]="selectedTab() === 'BRIEF'" (click)="setTab('BRIEF')">
+        <span class="material-symbols-outlined font-icon" style="font-size:18px;margin-right:6px;">description</span> Creative Briefs
+      </button>
+
+      <button class="btn studio-nav-btn" [class.active-nav]="selectedTab() === 'COMPETITOR'" (click)="setTab('COMPETITOR')">
+        <span class="material-symbols-outlined font-icon" style="font-size:18px;margin-right:6px;">troubleshoot</span> Competitor Inspired
+      </button>
+
+      <button class="btn studio-nav-btn" [class.active-nav]="selectedTab() === 'TEMPLATES'" (click)="setTab('TEMPLATES')">
+        <span class="material-symbols-outlined font-icon" style="font-size:18px;margin-right:6px;">auto_awesome_motion</span> Saved Templates
+      </button>
+    </div>
+
+    <!-- Right Interaction Panel -->
+    <div class="studio-main-content" style="display:flex;flex-direction:column;gap:24px;">
+      
+      <!-- Current Active Generator Card -->
+      <div class="card generator-card animate-slide-up" style="padding:20px;border-color:var(--cyan-border);">
+        
+        <!-- Tab 1: Ad Copy -->
+        @if (selectedTab() === 'AD_COPY') {
+          <h3 style="margin-top:0;margin-bottom:16px;">✨ Generate Meta Ad Copy</h3>
+          <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="form-group form-full" style="grid-column:1 / -1;">
+              <label>Product or Service Description *</label>
+              <input class="input" [(ngModel)]="product" placeholder="e.g. Premium leather travel bags with laptop sleeves" />
+            </div>
+            <div class="form-group">
+              <label>Target Audience Demographic</label>
+              <input class="input" [(ngModel)]="audience" placeholder="e.g. Frequent business travelers, age 28-45" />
+            </div>
+            <div class="form-group">
+              <label>Platform Placement</label>
+              <select class="input" [(ngModel)]="platform">
+                @for (p of platformOptions; track p) {
+                  <option [value]="p">{{ platformLabel(p) }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tone of Voice</label>
+              <select class="input" [(ngModel)]="tone">
+                @for (t of toneOptions; track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" (click)="generateAdCopy()" [disabled]="generating() || !product.trim()">
+            @if (generating()) { <span class="spinner-sm"></span> Generating... } @else { ✨ Generate Copy Variations }
+          </button>
+        }
+
+        <!-- Tab 2: Social Media Post -->
+        @if (selectedTab() === 'SOCIAL') {
+          <h3 style="margin-top:0;margin-bottom:16px;">📱 Generate Social Media Post</h3>
+          <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="form-group form-full" style="grid-column:1 / -1;">
+              <label>Post Topic / Hook *</label>
+              <input class="input" [(ngModel)]="socialProduct" placeholder="e.g. 5 signs your B2B sales funnel is leaking data" />
+            </div>
+            <div class="form-group">
+              <label>Audience / Reader profile</label>
+              <input class="input" [(ngModel)]="socialAudience" placeholder="e.g. SaaS tech founders & sales managers" />
+            </div>
+            <div class="form-group">
+              <label>Social Channel</label>
+              <select class="input" [(ngModel)]="socialPlatform">
+                @for (sp of socialPlatforms; track sp) {
+                  <option [value]="sp">{{ sp }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tone of Voice</label>
+              <select class="input" [(ngModel)]="socialTone">
+                @for (t of toneOptions; track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" (click)="generateSocial()" [disabled]="generating() || !socialProduct.trim()">
+            @if (generating()) { <span class="spinner-sm"></span> Generating... } @else { 🚀 Generate Social Post }
+          </button>
+        }
+
+        <!-- Tab 3: WhatsApp Campaigns -->
+        @if (selectedTab() === 'WHATSAPP') {
+          <h3 style="margin-top:0;margin-bottom:16px;">💬 WhatsApp SDR Broadcaster</h3>
+          <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="form-group form-full" style="grid-column:1 / -1;">
+              <label>Campaign Objective / Product *</label>
+              <input class="input" [(ngModel)]="whatsappProduct" placeholder="e.g. Webinar registration for AI Automation Workshop" />
+            </div>
+            <div class="form-group">
+              <label>Target Segment</label>
+              <input class="input" [(ngModel)]="whatsappAudience" placeholder="e.g. Registered free-tier subscribers" />
+            </div>
+            <div class="form-group">
+              <label>Special Offer / Callout</label>
+              <input class="input" [(ngModel)]="whatsappOffer" placeholder="e.g. Free checklist worksheet to first 50 signups" />
+            </div>
+            <div class="form-group" style="grid-column:1 / -1;">
+              <label>Call To Action Link</label>
+              <input class="input" [(ngModel)]="whatsappCta" placeholder="e.g. dolphin.ai/workshop" />
+            </div>
+          </div>
+          <button class="btn btn-primary" (click)="generateWhatsApp()" [disabled]="generating() || !whatsappProduct.trim()">
+            @if (generating()) { <span class="spinner-sm"></span> Generating... } @else { 💬 Generate Broadcast Template }
+          </button>
+        }
+
+        <!-- Tab 4: Creative Briefs -->
+        @if (selectedTab() === 'BRIEF') {
+          <h3 style="margin-top:0;margin-bottom:16px;">📝 Formulate Creative Brief</h3>
+          <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="form-group form-full" style="grid-column:1 / -1;">
+              <label>Core Product / Project Name *</label>
+              <input class="input" [(ngModel)]="briefProduct" placeholder="e.g. DolphinAI Growth Suite launch" />
+            </div>
+            <div class="form-group">
+              <label>Aesthetic Vibe & Theme</label>
+              <select class="input" [(ngModel)]="briefVibe">
+                @for (vb of vibes; track vb) {
+                  <option [value]="vb">{{ vb }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Campaign Message Hook</label>
+              <input class="input" [(ngModel)]="briefMessage" placeholder="e.g. Automate 90% of lead tracking and focus on conversions" />
+            </div>
+            <div class="form-group form-full" style="grid-column:1 / -1;">
+              <label>Brand Guidelines / Design Restrictions</label>
+              <input class="input" [(ngModel)]="briefIdentity" placeholder="e.g. Use dark theme aesthetics, Outfit font, HSL color tokens" />
+            </div>
+          </div>
+          <button class="btn btn-primary" (click)="generateBrief()" [disabled]="generating() || !briefProduct.trim()">
+            @if (generating()) { <span class="spinner-sm"></span> Formulating Brief... } @else { 📝 Compile Design Brief }
+          </button>
+        }
+
+        <!-- Tab 5: Competitor Inspired -->
+        @if (selectedTab() === 'COMPETITOR') {
+          <h3 style="margin-top:0;margin-bottom:16px;">🔍 Competitor Ad Intelligence</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Enter a competitor domain to analyze their active advertising copy formats and generate inspiration cues.</p>
+          <div class="form-grid" style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px;">
+            <div class="form-group">
+              <label>Competitor Website URL *</label>
+              <div style="display:flex;gap:10px;">
+                <input class="input" [(ngModel)]="competitorUrl" placeholder="e.g. competitor.com" style="flex:1;" />
+                <button class="btn btn-primary" (click)="analyzeCompetitor()" [disabled]="generating() || !competitorUrl.trim()">
+                  @if (generating()) { <span class="spinner-sm"></span> Analyzing... } @else { Audit Ads }
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+            <h4 style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:12px;">Active Ad Intel Feed</h4>
+            <div class="competitor-insights-container" style="display:flex;flex-direction:column;gap:10px;max-height:220px;overflow-y:auto;">
+              @for (item of competitorInsights(); track item.id) {
+                <div style="padding:10px;background:rgba(0,0,0,0.1);border:1px solid var(--border);border-radius:8px;font-size:12px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <strong style="color:var(--text-primary);">{{ item.competitorName }}</strong>
+                    <span class="badge info" style="font-size:9px;">{{ item.strategy }}</span>
+                  </div>
+                  <div style="color:var(--text-muted);line-height:1.4;">{{ item.insight }}</div>
+                  <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Aesthetic Tag: {{ item.visualHook }}</div>
+                </div>
+              } @empty {
+                <div style="text-align:center;font-size:11px;color:var(--text-muted);padding:20px 0;">No audited domain insights. Start by auditing your first competitor.</div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Tab 6: Saved Templates -->
+        @if (selectedTab() === 'TEMPLATES') {
+          <h3 style="margin-top:0;margin-bottom:16px;">📋 Library Templates</h3>
+          <div class="templates-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            @for (tpl of templates; track tpl.title) {
+              <div class="template-card" style="border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+                <h4 style="margin:0;font-size:13px;color:var(--text-primary);">{{ tpl.title }}</h4>
+                <p style="margin:0;font-size:11px;color:var(--text-muted);line-height:1.4;flex:1;">{{ tpl.description }}</p>
+                <button class="btn btn-ghost btn-sm" style="align-self:flex-start;font-size:10.5px;padding:4px 8px;" (click)="applyTemplate(tpl)">Use Template</button>
+              </div>
+            }
+          </div>
+        }
+
+      </div>
+
+      <!-- Generated Asset History Section -->
+      <div>
+        <h3 style="margin-bottom:12px;font-size:13px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;">Generated Assets Library</h3>
+        
+        @if (loading()) {
+          <div class="loading-rows">
+            @for (_ of [1,2]; track $index) {
+              <div class="skeleton-card" style="height:120px"></div>
+            }
+          </div>
+        } @else {
+          
+          <div class="creatives-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:16px;">
+            @for (c of creatives(); track c.id) {
+              <div class="creative-card animate-slide-up" [class.creative-card--ai]="c.generated_by === 'AI_GENERATED'">
+                
+                <div class="creative-card__header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <div class="creative-card__meta" style="display:flex;gap:6px;align-items:center;">
+                    <span class="badge {{ statusClass(c.status) }}" style="font-size:10px;">{{ c.status }}</span>
+                    <span class="creative-card__platform" style="font-size:10px;color:var(--text-muted);">{{ platformLabel(c.platform) }}</span>
+                  </div>
+                  @if (c.generated_by === 'AI_GENERATED') {
+                    <span class="creative-card__ai-tag" style="font-size:9px;background:var(--primary-glow);color:var(--primary);padding:1px 5px;border-radius:4px;font-weight:700;">🤖 AI</span>
+                  }
+                </div>
+
+                @if (c.image_url) {
+                  <div class="creative-card__image-container" style="width:100%;height:140px;overflow:hidden;border-radius:6px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.05)">
+                    <img [src]="c.image_url" style="width:100%;height:100%;object-fit:cover" alt="Ad Graphic" />
+                  </div>
+                }
+
+                <div class="creative-card__content" style="margin-bottom:12px;">
+                  @if (c.headline) {
+                    <h4 class="creative-card__headline" style="margin:0 0 6px 0;font-size:13px;font-weight:700;color:var(--text-primary);">{{ c.headline }}</h4>
+                  }
+                  @if (c.body) {
+                    <p class="creative-card__body" style="margin:0 0 8px 0;font-size:11.5px;color:var(--text-muted);line-height:1.4;">{{ c.body }}</p>
+                  }
+                  @if (c.call_to_action) {
+                    <span class="creative-card__cta" style="font-size:11px;font-weight:600;color:var(--accent);">{{ c.call_to_action }}</span>
+                  }
+                </div>
+
+                <div class="creative-card__metrics" style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:10px;margin-bottom:12px;font-size:11px;">
+                  @if (c.predicted_ctr) {
+                    <span>Pred. CTR: <strong style="color:var(--primary);">{{ c.predicted_ctr }}%</strong></span>
+                  }
+                  @if (c.actual_ctr) {
+                    <span>Actual CTR: <strong style="color:var(--success);">{{ c.actual_ctr }}%</strong></span>
+                  }
+                </div>
+
+                <div class="creative-card__actions" style="display:flex;flex-wrap:wrap;gap:6px;">
+                  @if (c.status === 'DRAFT') {
+                    <button class="btn btn-success btn-sm" style="font-size:10px;padding:4px 8px;" (click)="updateStatus(c.id, 'APPROVED')">✅ Approve</button>
+                  }
+                  @if (c.status === 'APPROVED') {
+                    <button class="btn btn-primary btn-sm" style="font-size:10px;padding:4px 8px;" (click)="updateStatus(c.id, 'ACTIVE')">🚀 Activate</button>
+                  }
+                  @if (c.status === 'ACTIVE') {
+                    <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 8px;" (click)="updateStatus(c.id, 'PAUSED')">⏸ Pause</button>
+                  }
+                  
+                  <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 8px;background:rgba(0,212,255,0.08);color:var(--primary)" (click)="launchCreative(c, 'GOOGLE')">🌐 Google</button>
+                  <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 8px;background:rgba(255,0,80,0.08);color:#ff0050" (click)="launchCreative(c, 'TIKTOK')">🎵 TikTok</button>
+                </div>
+
+              </div>
+            } @empty {
+              <div style="grid-column: 1 / -1;text-align:center;padding:40px;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px;">
+                No generated assets in this workspace library. Use any generator above to start.
+              </div>
+            }
+          </div>
+
+        }
+      </div>
+
+    </div>
+
+  </div>
+
+</div>

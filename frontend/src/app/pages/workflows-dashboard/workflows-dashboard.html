@@ -1,0 +1,224 @@
+<div class="workflows-container animate-fade-in">
+  <!-- Header -->
+  <div class="workflows-header">
+    <div class="header-title">
+      <h1>⚡ Automation Hub</h1>
+      <p>Configure templates, review activity history, and authorize pending lead follow-ups.</p>
+    </div>
+
+    <!-- Trigger Panel -->
+    <div class="trigger-panel">
+      <input 
+        type="text" 
+        placeholder="Enter natural language automation prompt..." 
+        [ngModel]="customMessage()"
+        (ngModelChange)="customMessage.set($event)"
+        (keyup.enter)="triggerCustomWorkflow()"
+        [disabled]="submittingWorkflow()"
+      />
+      <button (click)="triggerCustomWorkflow()" [disabled]="submittingWorkflow()">
+        {{ submittingWorkflow() ? 'Spawning...' : 'Run Trigger' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Metric Cards -->
+  <div class="metric-grid">
+    <div class="metric-card card-running">
+      <div class="card-icon">🌀</div>
+      <div class="card-info">
+        <span class="label">Active Automations</span>
+        <span class="value">{{ stats().activeCount }}</span>
+      </div>
+    </div>
+    <div class="metric-card card-completed">
+      <div class="card-icon">✅</div>
+      <div class="card-info">
+        <span class="label">Completed Runs</span>
+        <span class="value">{{ stats().completedCount }}</span>
+      </div>
+    </div>
+    <div class="metric-card card-failed">
+      <div class="card-icon">❌</div>
+      <div class="card-info">
+        <span class="label">Failed Runs</span>
+        <span class="value">{{ stats().failedCount }}</span>
+      </div>
+    </div>
+    <div class="metric-card card-duration">
+      <div class="card-icon">⏱️</div>
+      <div class="card-info">
+        <span class="label">Avg Process Latency</span>
+        <span class="value">{{ stats().averageDurationMs / 1000 | number:'1.1-2' }}s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="dashboard-tabs">
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab() === 'executions'" 
+      (click)="activeTab.set('executions')"
+    >
+      Activity Logs
+    </button>
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab() === 'templates'" 
+      (click)="activeTab.set('templates')"
+    >
+      Automation Templates
+    </button>
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab() === 'approvals'" 
+      (click)="activeTab.set('approvals')"
+    >
+      Pending Approvals @if (approvals().length > 0) { <span class="badge">{{ approvals().length }}</span> }
+    </button>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="tab-content glass-pane">
+    @if (loading()) {
+      <div class="spinner-container">
+        <div class="spinner"></div>
+        <p>Retrieving activity logs...</p>
+      </div>
+    } @else {
+
+      <!-- Executions List -->
+      @if (activeTab() === 'executions') {
+        <div class="executions-view">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Automation Name</th>
+                <th>Execution ID</th>
+                <th>Context Agent</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (exec of executions(); track exec.id) {
+                <tr>
+                  <td>
+                    <div class="wf-name-group">
+                      <span class="wf-name">{{ exec.workflowName }}</span>
+                      <span class="wf-ver">v{{ exec.workflowVersion }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="trace-group">
+                      <span class="exec-id">ID: {{ exec.executionId | slice:0:8 }}</span>
+                    </div>
+                  </td>
+                  <td><span class="agent-pill">{{ exec.agentUsed || 'SDR Agent' }}</span></td>
+                  <td>
+                    <span class="status-badge" [ngClass]="getStatusBadgeClass(exec.status)">
+                      {{ exec.status }}
+                    </span>
+                  </td>
+                  <td>{{ exec.startTime | date:'short' }}</td>
+                  <td>{{ exec.executionDuration ? (exec.executionDuration / 1000 | number:'1.1-1') + 's' : '—' }}</td>
+                </tr>
+                <!-- Extended Details Row -->
+                @if (exec.userRequest || exec.finalResponse || exec.errorLogs) {
+                  <tr class="details-row">
+                    <td colspan="6">
+                      <div class="exec-details-grid">
+                        @if (exec.userRequest) {
+                          <div class="detail-block">
+                            <span class="block-title">Trigger Context</span>
+                            <pre>{{ exec.userRequest }}</pre>
+                          </div>
+                        }
+                        @if (exec.finalResponse) {
+                          <div class="detail-block">
+                            <span class="block-title">Execution Result</span>
+                            <pre class="success-pre">{{ exec.finalResponse }}</pre>
+                          </div>
+                        }
+                        @if (exec.errorLogs) {
+                          <div class="detail-block">
+                            <span class="block-title">Details</span>
+                            <pre class="error-pre">{{ exec.errorLogs }}</pre>
+                          </div>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              } @empty {
+                <tr>
+                  <td colspan="6" class="empty-state">No automation activity logs found for this workspace.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <!-- Templates Grid -->
+      @if (activeTab() === 'templates') {
+        <div class="templates-grid">
+          @for (tmpl of templates(); track tmpl.id) {
+            <div class="tmpl-card">
+              <div class="tmpl-card__header">
+                <span class="category">{{ tmpl.category }}</span>
+                <h3>{{ tmpl.name }}</h3>
+              </div>
+              <p class="tmpl-card__desc">{{ tmpl.description }}</p>
+              <div class="tmpl-card__footer">
+                <button (click)="customMessage.set('Deploy template: ' + tmpl.name); activeTab.set('executions')">
+                  Deploy Automation
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Human Approvals Queue -->
+      @if (activeTab() === 'approvals') {
+        <div class="approvals-view">
+          @for (appr of approvals(); track appr.id) {
+            <div class="approval-card">
+              <div class="approval-card__header">
+                <h3>Automation Action Pending Approval</h3>
+                <span class="time">{{ appr.createdAt | date:'short' }}</span>
+              </div>
+              <p>Action Ref: <code>{{ appr.executionId }}</code></p>
+
+              <div class="decision-form">
+                <input 
+                  type="text" 
+                  placeholder="Decision reason/notes..." 
+                  [(ngModel)]="approvalReason"
+                />
+                <div class="btn-group">
+                  <button class="btn-approve" (click)="respondToApproval(appr.id, 'APPROVED')">
+                    Approve & Run
+                  </button>
+                  <button class="btn-reject" (click)="respondToApproval(appr.id, 'REJECTED')">
+                    Reject Action
+                  </button>
+                </div>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state">
+              <span class="icon">🛡️</span>
+              <h3>No actions require approval</h3>
+              <p>All automated triggers are running seamlessly within parameters.</p>
+            </div>
+          }
+        </div>
+      }
+
+    }
+  </div>
+</div>

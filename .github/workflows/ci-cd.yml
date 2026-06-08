@@ -1,0 +1,115 @@
+name: 🐬 Chubby Dolphin AI — CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: docker.io
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/chubby-dolphin-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/chubby-dolphin-frontend
+
+jobs:
+
+  # ── Job 1: Test Backend ─────────────────────────────────────────
+  test-backend:
+    name: 🧪 Test Spring Boot
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: chubbydb_test
+          POSTGRES_USER: chubby
+          POSTGRES_PASSWORD: dolphin123
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: '21', distribution: temurin }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+      - name: Run tests
+        run: mvn test -pl backend -q
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/chubbydb_test
+          SPRING_DATASOURCE_USERNAME: chubby
+          SPRING_DATASOURCE_PASSWORD: dolphin123
+
+  # ── Job 2: Build Frontend ────────────────────────────────────────
+  build-frontend:
+    name: 🏗️ Build Angular
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm', cache-dependency-path: frontend/package-lock.json }
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Build production
+        run: npm run build -- --configuration production
+        working-directory: frontend
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+  # ── Job 3: Build & Push Docker Images ───────────────────────────
+  docker-build:
+    name: 🐳 Build & Push Docker
+    runs-on: ubuntu-latest
+    needs: [test-backend, build-frontend]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build & push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ env.BACKEND_IMAGE }}:latest,${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ env.FRONTEND_IMAGE }}:latest,${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Job 4: Deploy to Server ──────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/chubby-dolphin
+            # Pull latest images
+            docker-compose pull
+            # Zero-downtime restart
+            docker-compose up -d --remove-orphans
+            # Cleanup old images
+            docker image prune -f
+            echo "✅ Deployed successfully at $(date)"

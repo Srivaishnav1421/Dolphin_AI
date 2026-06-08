@@ -1,0 +1,361 @@
+@import '../../../styles/design-tokens.scss';
+
+.settings-page {
+  padding: $spacing-32;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-24;
+  overflow-y: auto;
+  max-width: $max-content-width;
+  margin: 0 auto;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  padding-bottom: $spacing-16;
+}
+
+.settings-title {
+  font-family: $font-family;
+  font-size: $font-title;
+  font-weight: 700;
+  color: $text-primary;
+  letter-spacing: -0.5px;
+}
+
+.settings-subtitle {
+  font-family: $font-family;
+  font-size: $font-caption;
+  color: $text-secondary;
+}
+
+.settings-alert {
+  padding: $spacing-12 $spacing-16;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: $color-success;
+  border-radius: $radius-md;
+  font-family: $font-family;
+  font-size: $font-caption;
+
+  &--error {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+    color: $color-danger;
+  }
+}
+
+.panel-desc {
+  font-family: $font-family;
+  font-size: $font-caption;
+  color: $text-secondary;
+  margin-bottom: $spacing-24;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-24;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-8;
+
+  &--full {
+    grid-column: span 2;
+  }
+}
+
+.form-label {
+  font-family: $font-family;
+  font-size: $font-caption;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+.form-input {
+  background: $bg-elevated;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: $spacing-10 $spacing-14;
+  font-family: $font-family;
+  font-size: $font-caption;
+  color: $text-primary;
+  transition: border-color $transition-fast;
+
+  &:focus {
+    outline: none;
+    border-color: $accent-primary;
+  }
+}
+
+.form-textarea {
+  height: 100px;
+  resize: none;
+
+  &--small {
+    height: 60px;
+  }
+}
+
+.form-select {
+  background: $bg-elevated;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: $spacing-10 $spacing-14;
+  font-family: $font-family;
+  font-size: $font-caption;
+  color: $text-primary;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: $accent-primary;
+  }
+}
+
+.token-copy-box {
+  display: flex;
+  gap: $spacing-8;
+}
+
+.token-input {
+  flex-grow: 1;
+  background: rgba(0, 0, 0, 0.2);
+  color: $text-muted;
+}
+
+.hint {
+  font-family: $font-family;
+  font-size: $font-meta;
+  color: $text-muted;
+  line-height: 1.4;
+}
+
+.meta-instructions {
+  margin-top: $spacing-32;
+  padding: $spacing-16;
+  border-radius: $radius-md;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+
+  h4 {
+    font-family: $font-family;
+    font-size: $font-caption;
+    font-weight: 600;
+    color: $text-primary;
+    margin-bottom: $spacing-8;
+  }
+
+  ol {
+    padding-left: $spacing-20;
+    font-family: $font-family;
+    font-size: $font-caption;
+    color: $text-secondary;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-8;
+  }
+
+  code {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: $accent-primary;
+  }
+}
+
+.ai-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $spacing-24;
+  margin-bottom: $spacing-24;
+}
+
+.telemetry-card {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-8;
+  padding: $spacing-16;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.015);
+  border-radius: $radius-md;
+}
+
+.telemetry-title {
+  font-family: $font-family;
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.telemetry-value {
+  font-family: $font-family;
+  font-size: $font-title;
+  font-weight: 700;
+  color: $text-primary;
+}
+
+.telemetry-progress-bg {
+  height: 4px;
+  background: $bg-elevated;
+  border-radius: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.telemetry-progress-fill {
+  height: 100%;
+  background: $accent-primary;
+  border-radius: 2px;
+}
+
+.telemetry-hint {
+  font-family: $font-family;
+  font-size: 10px;
+  color: $text-muted;
+}
+
+.provider-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: $spacing-16;
+  margin-top: $spacing-12;
+}
+
+.provider-card {
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: $spacing-16;
+  background: $bg-surface;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-8;
+  transition: all $transition-fast;
+
+  &:hover:not(.provider-card--disabled) {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.01);
+  }
+
+  &--active {
+    border-color: $accent-primary;
+    background: rgba(99, 102, 241, 0.04) !important;
+  }
+
+  &--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.provider-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.provider-name {
+  font-family: $font-family;
+  font-size: $font-caption;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+.status-badge {
+  font-family: $font-family;
+  font-size: 10px;
+  color: $text-muted;
+
+  &--active {
+    color: $color-success;
+  }
+}
+
+.provider-model {
+  font-family: $font-family;
+  font-size: $font-meta;
+  color: $text-secondary;
+}
+
+.active-badge {
+  font-family: $font-family;
+  font-size: 10px;
+  color: $accent-primary;
+  font-weight: 600;
+}
+
+.budget-section {
+  margin-top: $spacing-32;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  padding-top: $spacing-24;
+}
+
+.section-title {
+  font-family: $font-family;
+  font-size: 16px;
+  font-weight: 600;
+  color: $text-primary;
+  margin-bottom: $spacing-8;
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  cursor: pointer;
+  font-family: $font-family;
+  font-size: $font-caption;
+  color: $text-primary;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: $spacing-24;
+}
+
+.loading-rows {
+  width: 100%;
+}
+
+.skeleton-card {
+  width: 100%;
+  border-radius: $radius-lg;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.08) 37%,
+    rgba(255, 255, 255, 0.03) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-group--full {
+    grid-column: span 1;
+  }
+  .ai-telemetry-grid {
+    grid-template-columns: 1fr;
+  }
+}
