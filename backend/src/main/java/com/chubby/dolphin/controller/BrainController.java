@@ -3,6 +3,7 @@ package com.chubby.dolphin.controller;
 import com.chubby.dolphin.entity.BrainDecision;
 import com.chubby.dolphin.entity.BrainEvent;
 import com.chubby.dolphin.entity.Campaign;
+import com.chubby.dolphin.brain.BrainActionAuditService;
 import com.chubby.dolphin.repository.BrainEventRepository;
 import com.chubby.dolphin.repository.CampaignRepository;
 import com.chubby.dolphin.repository.WalletRepository;
@@ -41,6 +42,7 @@ public class BrainController {
     private final ObjectMapper         mapper;
     private final CompetitorScraperService competitorScraper;
     private final com.chubby.dolphin.service.AdvantageExperimentService experimentService;
+    private final BrainActionAuditService actionAuditService;
 
     public BrainController(CampaignRepository campaignRepo,
                            BrainEventRepository brainEventRepo,
@@ -51,7 +53,8 @@ public class BrainController {
                            SecurityUtils sec,
                            ObjectMapper mapper,
                            CompetitorScraperService competitorScraper,
-                           com.chubby.dolphin.service.AdvantageExperimentService experimentService) {
+                           com.chubby.dolphin.service.AdvantageExperimentService experimentService,
+                           BrainActionAuditService actionAuditService) {
         this.campaignRepo = campaignRepo;
         this.brainEventRepo = brainEventRepo;
         this.walletRepo = walletRepo;
@@ -62,6 +65,7 @@ public class BrainController {
         this.mapper = mapper;
         this.competitorScraper = competitorScraper;
         this.experimentService = experimentService;
+        this.actionAuditService = actionAuditService;
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -80,6 +84,24 @@ public class BrainController {
     public ResponseEntity<?> allEvents() {
         return ResponseEntity.ok(
             brainEventRepo.findByAccountIdOrderByCreatedAtDesc(sec.currentAccountId())
+        );
+    }
+
+    /** Business-facing AI action trail for the current workspace. No model/provider/token details are returned. */
+    @GetMapping("/brain/actions")
+    public ResponseEntity<?> recentAiActions() {
+        return ResponseEntity.ok(
+                actionAuditService.recentAiActions(sec.currentAccountId()).stream()
+                        .map(a -> Map.of(
+                                "id", a.getId(),
+                                "action", a.getAction(),
+                                "entity_type", a.getEntityType() != null ? a.getEntityType() : (a.getResourceType() != null ? a.getResourceType() : "BusinessRecord"),
+                                "entity_id", a.getEntityId() != null ? a.getEntityId() : (a.getResourceId() != null ? a.getResourceId() : ""),
+                                "details", a.getDetails() != null ? a.getDetails() : "",
+                                "status", a.getEventType() != null ? a.getEventType().replace("AI_ACTION_", "") : "LOGGED",
+                                "created_at", a.getTimestamp()
+                        ))
+                        .collect(Collectors.toList())
         );
     }
 

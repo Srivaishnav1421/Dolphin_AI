@@ -27,6 +27,7 @@ public class BrainExecutionServiceTest {
     private BrainMemoryService memoryService;
     private BrainGovernanceService governanceService;
     private BrainAutomationPolicyService policyService;
+    private BrainActionAuditService actionAuditService;
     private SimpMessagingTemplate wsTemplate;
     private ObjectMapper mapper;
     private BrainExecutionService executionService;
@@ -41,13 +42,14 @@ public class BrainExecutionServiceTest {
         memoryService = mock(BrainMemoryService.class);
         governanceService = mock(BrainGovernanceService.class);
         policyService = mock(BrainAutomationPolicyService.class);
+        actionAuditService = mock(BrainActionAuditService.class);
         wsTemplate = mock(SimpMessagingTemplate.class);
         mapper = new ObjectMapper();
 
         executionService = new BrainExecutionService(
                 decisionRepo, campaignRepo, historyRepo, outcomeAnalyzer,
                 learningEngine, memoryService, governanceService, policyService,
-                wsTemplate, mapper
+                actionAuditService, wsTemplate, mapper
         );
     }
 

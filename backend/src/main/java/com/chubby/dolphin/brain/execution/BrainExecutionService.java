@@ -31,6 +31,7 @@ public class BrainExecutionService {
     private final BrainMemoryService memoryService;
     private final BrainGovernanceService governanceService;
     private final BrainAutomationPolicyService policyService;
+    private final BrainActionAuditService actionAuditService;
     private final SimpMessagingTemplate wsTemplate;
     private final ObjectMapper mapper;
 
@@ -44,6 +45,7 @@ public class BrainExecutionService {
             BrainMemoryService memoryService,
             BrainGovernanceService governanceService,
             BrainAutomationPolicyService policyService,
+            BrainActionAuditService actionAuditService,
             @Autowired(required = false) SimpMessagingTemplate wsTemplate,
             ObjectMapper mapper) {
         this.decisionRepo = decisionRepo;
@@ -54,6 +56,7 @@ public class BrainExecutionService {
         this.memoryService = memoryService;
         this.governanceService = governanceService;
         this.policyService = policyService;
+        this.actionAuditService = actionAuditService;
         this.wsTemplate = wsTemplate;
         this.mapper = mapper;
     }
@@ -93,11 +96,24 @@ public class BrainExecutionService {
         BrainDecision decision = decisionRepo.findById(decisionId)
                 .orElseThrow(() -> new RuntimeException("Decision not found: " + decisionId));
 
+        actionAuditService.logAiAction(
+                decision.getAccountId(),
+                "CONTROLLED_AUTONOMOUS",
+                "EXECUTE_RECOMMENDATION",
+                "BrainDecision",
+                decisionId,
+                decision.getReason(),
+                decision.getThresholdBreached() != null ? decision.getThresholdBreached() : "APPROVED_DECISION",
+                "STARTED"
+        );
+
         broadcastWs(decision.getAccountId(), decisionId, "EXECUTION_STARTED", "🚀 Execution started for recommendation: " + decision.getDecisionType());
 
         if (!validateExecution(decision)) {
             decision.setStatus("FAILED");
             decisionRepo.save(decision);
+            actionAuditService.logAiAction(decision.getAccountId(), "CONTROLLED_AUTONOMOUS", "EXECUTE_RECOMMENDATION",
+                    "BrainDecision", decisionId, "Pre-flight safety checks failed", "SAFETY_VALIDATION", "FAILED");
             broadcastWs(decision.getAccountId(), decisionId, "EXECUTION_FAILED", "❌ Validation check failed for recommendation: " + decision.getDecisionType());
             return ExecutionResult.builder()
                     .decisionId(decisionId)
@@ -168,6 +184,10 @@ public class BrainExecutionService {
 
             broadcastWs(decision.getAccountId(), decisionId, "EXECUTION_COMPLETED", "✅ Execution completed successfully: " + decision.getDecisionType());
 
+            actionAuditService.logAiAction(decision.getAccountId(), "CONTROLLED_AUTONOMOUS", decision.getDecisionType(),
+                    "Campaign", decision.getCampaignId(), decision.getReason(),
+                    decision.getThresholdBreached() != null ? decision.getThresholdBreached() : "APPROVED_DECISION", "SUCCESS");
+
             return ExecutionResult.builder()
                     .id(decision.getId())
                     .decisionId(decisionId)
@@ -183,6 +203,8 @@ public class BrainExecutionService {
             log.error("Execution failed for decision: {}", decisionId, e);
             decision.setStatus("FAILED");
             decisionRepo.save(decision);
+            actionAuditService.logAiAction(decision.getAccountId(), "CONTROLLED_AUTONOMOUS", "EXECUTE_RECOMMENDATION",
+                    "BrainDecision", decisionId, e.getMessage(), "EXECUTION_EXCEPTION", "FAILED");
             broadcastWs(decision.getAccountId(), decisionId, "EXECUTION_FAILED", "❌ Execution failed: " + e.getMessage());
             return ExecutionResult.builder()
                     .decisionId(decisionId)
@@ -217,10 +239,16 @@ public class BrainExecutionService {
             decision.setStatus("ROLLED_BACK");
             decisionRepo.save(decision);
 
+            actionAuditService.logAiAction(decision.getAccountId(), "CONTROLLED_AUTONOMOUS", "ROLLBACK_EXECUTION",
+                    "BrainDecision", decision.getId(), "Restored previous campaign state from saved snapshot.",
+                    "MANUAL_ROLLBACK", "SUCCESS");
+
             broadcastWs(decision.getAccountId(), decision.getId(), "EXECUTION_ROLLED_BACK", "🔄 Rollback successfully completed.");
             return true;
         } catch (Exception e) {
             log.error("Failed to restore and rollback decision snapshot: {}", decision.getId(), e);
+            actionAuditService.logAiAction(decision.getAccountId(), "CONTROLLED_AUTONOMOUS", "ROLLBACK_EXECUTION",
+                    "BrainDecision", decision.getId(), e.getMessage(), "MANUAL_ROLLBACK", "FAILED");
             return false;
         }
     }
