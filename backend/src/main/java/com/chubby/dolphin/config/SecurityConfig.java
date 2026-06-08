@@ -43,7 +43,10 @@ public class SecurityConfig {
             "/ws/**",
             // Meta webhook endpoints (called by Meta's servers, no JWT)
             "/api/leads/webhook/**",
-            "/webhooks/whatsapp/**"
+            "/webhooks/whatsapp/**",
+            // Public landing pages and lead-capture forms
+            "/api/public/landing/**",
+            "/api/public/forms/**"
     };
 
     @Bean

@@ -5,6 +5,7 @@ import {
   Campaign, Lead, WalletStatus, EmasMetrics,
   BrainEvent, DashboardSummary, ArbitrageResult,
   MetaConnection, BrainDecision, AdCreative, LlmProviderStatus,
+  MarketingForm, LandingPage, FormSubmission,
 } from '../../shared/models';
 
 @Injectable({ providedIn: 'root' })
@@ -43,6 +44,46 @@ export class ApiService {
   }
   resumeCampaign(id: string): Observable<Campaign> {
     return this.http.post<Campaign>(`${this.base}/api/campaigns/${id}/resume`, {});
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  Marketing Engine: landing pages, forms, submissions, analytics
+  // ══════════════════════════════════════════════════════════════════
+  getMarketingTemplates(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/api/marketing/templates`);
+  }
+  getMarketingForms(): Observable<MarketingForm[]> {
+    return this.http.get<MarketingForm[]>(`${this.base}/api/marketing/forms`);
+  }
+  createMarketingForm(body: Partial<MarketingForm>): Observable<MarketingForm> {
+    return this.http.post<MarketingForm>(`${this.base}/api/marketing/forms`, body);
+  }
+  updateMarketingForm(id: string, body: Partial<MarketingForm>): Observable<MarketingForm> {
+    return this.http.put<MarketingForm>(`${this.base}/api/marketing/forms/${id}`, body);
+  }
+  getLandingPages(): Observable<LandingPage[]> {
+    return this.http.get<LandingPage[]>(`${this.base}/api/marketing/landing-pages`);
+  }
+  createLandingPage(body: Partial<LandingPage>): Observable<LandingPage> {
+    return this.http.post<LandingPage>(`${this.base}/api/marketing/landing-pages`, body);
+  }
+  updateLandingPage(id: string, body: Partial<LandingPage>): Observable<LandingPage> {
+    return this.http.put<LandingPage>(`${this.base}/api/marketing/landing-pages/${id}`, body);
+  }
+  getFormSubmissions(): Observable<FormSubmission[]> {
+    return this.http.get<FormSubmission[]>(`${this.base}/api/marketing/submissions`);
+  }
+  getMarketingAnalytics(params?: { campaignId?: string; landingPageId?: string; formId?: string }): Observable<any> {
+    let httpParams = new HttpParams();
+    if (params?.campaignId) httpParams = httpParams.set('campaignId', params.campaignId);
+    if (params?.landingPageId) httpParams = httpParams.set('landingPageId', params.landingPageId);
+    if (params?.formId) httpParams = httpParams.set('formId', params.formId);
+    return this.http.get<any>(`${this.base}/api/marketing/analytics`, { params: httpParams });
+  }
+  submitPublicForm(workspaceId: string, formId: string, body: any, landingPageId?: string): Observable<any> {
+    let params = new HttpParams();
+    if (landingPageId) params = params.set('landingPageId', landingPageId);
+    return this.http.post<any>(`${this.base}/api/public/forms/${workspaceId}/${formId}/submit`, body, { params });
   }
 
   // ══════════════════════════════════════════════════════════════════

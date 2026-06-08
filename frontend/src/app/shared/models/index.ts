@@ -215,3 +215,55 @@ export interface ArbitrageResult {
   actions:            Array<{ campaign: string; change: string }>;
   llm_provider?:      string;
 }
+
+export interface MarketingForm {
+  id: string;
+  account_id?: string;
+  workspaceId?: string;
+  name: string;
+  slug: string;
+  industryType?: string;
+  campaignId?: string;
+  status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+  fieldsJson?: string;
+  settingsJson?: string;
+  spamProtectionEnabled?: boolean;
+  triggerAutomation?: boolean;
+  submissionsCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LandingPage {
+  id: string;
+  account_id?: string;
+  workspaceId?: string;
+  title: string;
+  slug: string;
+  industryType?: string;
+  templateKey?: string;
+  campaignId?: string;
+  formId?: string;
+  status: 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED';
+  sectionsJson?: string;
+  seoJson?: string;
+  customDomain?: string;
+  publicPath?: string;
+  visits?: number;
+  submissions?: number;
+  publishedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface FormSubmission {
+  id: string;
+  formId: string;
+  landingPageId?: string;
+  campaignId?: string;
+  leadId?: string;
+  source: string;
+  status: 'ACCEPTED' | 'SPAM_REJECTED' | 'FAILED';
+  payloadJson?: string;
+  createdAt: string;
+}
