@@ -10,8 +10,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -47,9 +45,9 @@ public class ConversationalSdrServiceTest {
         mockLead.setMessage("Inbound WhatsApp query");
         mockLead.setStatus("WARM");
         mockLead.setScore(0.5);
+        mockLead.setWorkspaceId("workspace-1");
 
-        when(leadRepo.findById(leadId)).thenReturn(Optional.of(mockLead));
-        when(chatRepo.findByLeadIdOrderByCreatedAtAsc(leadId)).thenReturn(new ArrayList<>());
+        when(chatRepo.findByLeadIdAndWorkspaceIdOrderByCreatedAtAsc(leadId, "workspace-1")).thenReturn(new ArrayList<>());
         
         BusinessLlmFacadeService.LlmResponse mockLlmResponse = new BusinessLlmFacadeService.LlmResponse(
             "Hello Aravind! I would be delighted to schedule a 10-minute demo. Let me know what time works best.",
@@ -62,7 +60,7 @@ public class ConversationalSdrServiceTest {
         when(leadRepo.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        LeadChatMessage reply = sdrService.receiveMessage(leadId, messageContent);
+        LeadChatMessage reply = sdrService.receiveMessage(mockLead, messageContent);
 
         // Assert
         assertNotNull(reply);

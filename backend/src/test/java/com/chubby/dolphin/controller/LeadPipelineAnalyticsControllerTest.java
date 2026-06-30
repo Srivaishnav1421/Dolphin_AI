@@ -3,6 +3,7 @@ package com.chubby.dolphin.controller;
 import com.chubby.dolphin.entity.SystemAlert;
 import com.chubby.dolphin.repository.LeadPipelineEventRepository;
 import com.chubby.dolphin.repository.SystemAlertRepository;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,14 +23,15 @@ public class LeadPipelineAnalyticsControllerTest {
     @Mock private LeadPipelineEventRepository eventRepo;
     @Mock private SystemAlertRepository alertRepo;
     @Mock private SecurityUtils sec;
+    @Mock private AccessControlService access;
 
     private LeadPipelineAnalyticsController controller;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        controller = new LeadPipelineAnalyticsController(eventRepo, alertRepo, sec);
-        when(sec.currentAccountId()).thenReturn("workspace-test");
+        controller = new LeadPipelineAnalyticsController(eventRepo, alertRepo, sec, access);
+        when(sec.currentWorkspaceId()).thenReturn("workspace-test");
     }
 
     @Test

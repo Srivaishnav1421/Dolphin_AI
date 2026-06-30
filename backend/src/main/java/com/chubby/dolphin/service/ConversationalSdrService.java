@@ -1,17 +1,18 @@
 package com.chubby.dolphin.service;
 
+import com.chubby.dolphin.entity.Lead;
 import com.chubby.dolphin.entity.LeadChatMessage;
 import java.util.List;
 
 public interface ConversationalSdrService {
     /**
-     * Ingests a new message from a lead, formulates an automated AI SDR response,
-     * logs both messages, and returns the chatbot's response message.
+     * Ingests a message for a lead that has already been loaded and tenant-checked
+     * by the caller.
      */
-    LeadChatMessage receiveMessage(String leadId, String messageContent);
+    LeadChatMessage receiveMessage(Lead lead, String messageContent);
 
     /**
-     * Retrieves the sequential chat history for a specific lead.
+     * Retrieves tenant-scoped conversation history for a lead already verified by the caller.
      */
-    List<LeadChatMessage> getConversationHistory(String leadId);
+    List<LeadChatMessage> getConversationHistory(String leadId, String workspaceId);
 }

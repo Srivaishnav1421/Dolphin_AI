@@ -6,14 +6,17 @@ import java.util.List;
 
 public interface LeadRepository extends JpaRepository<Lead, String> {
     List<Lead> findByWorkspaceId(String workspaceId);
+    long countByWorkspaceIdIn(List<String> workspaceIds);
     List<Lead> findByWorkspaceIdAndStatus(String workspaceId, String status);
+    List<Lead> findByWorkspaceIdOrderByCreatedAtDesc(String workspaceId);
+    List<Lead> findByWorkspaceIdAndStatusOrderByCreatedAtDesc(String workspaceId, String status);
     java.util.Optional<Lead> findByIdAndWorkspaceId(String id, String workspaceId);
 
     default List<Lead> findByAccountId(String accountId) {
-        return findByWorkspaceId(accountId);
+        return findByWorkspaceIdOrderByCreatedAtDesc(accountId);
     }
     default List<Lead> findByAccountIdAndStatus(String accountId, String status) {
-        return findByWorkspaceIdAndStatus(accountId, status);
+        return findByWorkspaceIdAndStatusOrderByCreatedAtDesc(accountId, status);
     }
     
     java.util.Optional<Lead> findFirstByPhoneOrderByCreatedAtDesc(String phone);

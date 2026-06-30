@@ -36,7 +36,10 @@ public class Lead {
     @Column(length = 2000)
     private String message;
 
-    private String status;       // HOT, WARM, COLD, UNQUALIFIABLE
+    private String status;       // NEW, CONTACTED, QUALIFIED, WON, LOST
+
+    @Column(length = 50)
+    private String temperature; // HOT, WARM, COLD, UNKNOWN (from lead scoring)
 
     @Column(name = "pipeline_stage", length = 80)
     private String pipelineStage = "NEW_LEAD";
@@ -139,6 +142,9 @@ public class Lead {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getTemperature() { return temperature; }
+    public void setTemperature(String temperature) { this.temperature = temperature; }
 
     public String getPipelineStage() { return pipelineStage; }
     public void setPipelineStage(String pipelineStage) { this.pipelineStage = pipelineStage; }

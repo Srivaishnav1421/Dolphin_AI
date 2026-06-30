@@ -29,14 +29,12 @@ public class ConversationalSdrServiceImpl implements ConversationalSdrService {
 
     @Override
     @Transactional
-    public LeadChatMessage receiveMessage(String leadId, String messageContent) {
+    public LeadChatMessage receiveMessage(Lead lead, String messageContent) {
+        String leadId = lead.getId();
         log.info("💬 SDR Bot received message from lead [Id: {}]: {}", leadId, messageContent);
 
-        Lead lead = leadRepo.findById(leadId)
-                .orElseThrow(() -> new RuntimeException("Lead not found with ID: " + leadId));
-
         // Resolve conversationId and threadId from existing history if possible
-        List<LeadChatMessage> historyBefore = chatRepo.findByLeadIdOrderByCreatedAtAsc(leadId);
+        List<LeadChatMessage> historyBefore = chatRepo.findByLeadIdAndWorkspaceIdOrderByCreatedAtAsc(leadId, lead.getWorkspaceId());
         String conversationId;
         String threadId;
         if (historyBefore != null && !historyBefore.isEmpty()) {
@@ -60,7 +58,7 @@ public class ConversationalSdrServiceImpl implements ConversationalSdrService {
         chatRepo.save(incoming);
 
         // 2. Fetch entire conversation history for contextual memory
-        List<LeadChatMessage> history = chatRepo.findByLeadIdOrderByCreatedAtAsc(leadId);
+        List<LeadChatMessage> history = chatRepo.findByLeadIdAndWorkspaceIdOrderByCreatedAtAsc(leadId, lead.getWorkspaceId());
 
         // 3. Compile context prompt
         StringBuilder chatLog = new StringBuilder();
@@ -90,6 +88,9 @@ public class ConversationalSdrServiceImpl implements ConversationalSdrService {
 
         BusinessLlmFacadeService.LlmResponse response = llmRouter.ask(prompt);
         String botReplyText = response.text().trim();
+        if ("NONE".equalsIgnoreCase(response.provider())) {
+            botReplyText = "Thanks, I have captured this. I will share the details with the team and help schedule the next follow-up.";
+        }
 
         // 4. Save and return bot response
         LeadChatMessage botResponse = new LeadChatMessage();
@@ -134,7 +135,7 @@ public class ConversationalSdrServiceImpl implements ConversationalSdrService {
     }
 
     @Override
-    public List<LeadChatMessage> getConversationHistory(String leadId) {
-        return chatRepo.findByLeadIdOrderByCreatedAtAsc(leadId);
+    public List<LeadChatMessage> getConversationHistory(String leadId, String workspaceId) {
+        return chatRepo.findByLeadIdAndWorkspaceIdOrderByCreatedAtAsc(leadId, workspaceId);
     }
 }
