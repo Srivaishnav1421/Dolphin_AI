@@ -77,6 +77,32 @@
   }
 }
 
+.local-mode-warning,
+.workflow-alert {
+  border: 1px solid rgba(255, 204, 0, 0.28);
+  background: rgba(255, 204, 0, 0.08);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.88);
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.local-mode-warning {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workflow-alert--warning {
+  border-color: rgba(255, 204, 0, 0.28);
+}
+
+.workflow-alert--error {
+  border-color: rgba(255, 0, 127, 0.28);
+  background: rgba(255, 0, 127, 0.08);
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -650,5 +676,271 @@
   }
   .traces-sidebar-col {
     width: 100%;
+  }
+}
+
+/* Final theme-normalization layer: keeps Automation readable in both bright and dark modes. */
+.workflows-header {
+  .header-title {
+    h1 {
+      color: var(--text-primary);
+      letter-spacing: 0;
+    }
+
+    p {
+      color: var(--text-secondary);
+    }
+  }
+
+  .trigger-panel {
+    background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+    border-color: color-mix(in srgb, var(--border) 86%, transparent);
+    box-shadow: var(--shadow-sm);
+
+    input {
+      color: var(--text-primary);
+
+      &::placeholder {
+        color: var(--text-muted);
+      }
+    }
+
+    button {
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #7C5CFF));
+      color: #fff;
+      border-radius: 999px;
+      box-shadow: 0 12px 26px color-mix(in srgb, var(--accent) 24%, transparent);
+    }
+  }
+}
+
+.metric-grid .metric-card,
+.glass-pane,
+.templates-grid .tmpl-card,
+.approvals-view .approval-card,
+.node-inspector-pane {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 94%, transparent), color-mix(in srgb, var(--bg-surface) 62%, transparent)) !important;
+  border-color: color-mix(in srgb, var(--border) 88%, transparent) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+.metric-grid .metric-card {
+  .card-info {
+    .label {
+      color: var(--text-muted);
+    }
+
+    .value {
+      color: var(--text-primary);
+    }
+  }
+
+  &.card-running { border-left-color: var(--accent); }
+  &.card-completed { border-left-color: var(--success); }
+  &.card-failed { border-left-color: var(--danger); }
+  &.card-duration { border-left-color: var(--warning); }
+}
+
+.dashboard-tabs {
+  border-bottom-color: color-mix(in srgb, var(--border) 86%, transparent);
+
+  .tab-btn {
+    color: var(--text-muted);
+
+    &:hover {
+      color: var(--text-primary);
+    }
+
+    &.active {
+      color: var(--accent);
+
+      &::after {
+        background: var(--accent);
+        box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 22%, transparent);
+      }
+    }
+  }
+}
+
+.data-table {
+  th {
+    color: var(--text-muted);
+    border-bottom-color: var(--border);
+    background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+  }
+
+  td {
+    color: var(--text-secondary);
+    border-bottom-color: color-mix(in srgb, var(--border) 72%, transparent);
+  }
+
+  tr:hover td {
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+  }
+
+  .wf-name-group {
+    .wf-name { color: var(--text-primary); }
+    .wf-ver { color: var(--text-muted); }
+  }
+
+  .trace-group {
+    .trace-id { color: var(--text-muted); }
+    .exec-id { color: var(--accent); }
+  }
+
+  .agent-pill {
+    color: var(--accent);
+    background: var(--accent-light);
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  .status-badge {
+    &.badge-primary { background: var(--accent-light); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+    &.badge-success { background: var(--success-light); color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+    &.badge-danger { background: var(--danger-light); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+    &.badge-warning { background: var(--warning-light); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
+    &.badge-info { background: color-mix(in srgb, var(--bg-surface) 70%, transparent); color: var(--text-secondary); }
+  }
+
+  .action-btn.text-link {
+    color: var(--accent);
+  }
+
+  .details-row td {
+    background: color-mix(in srgb, var(--bg-card) 72%, transparent);
+    border-bottom-color: var(--border);
+  }
+}
+
+.exec-details-grid,
+.node-inspector-pane,
+.detail-payload pre {
+  background: color-mix(in srgb, var(--bg-surface) 68%, transparent) !important;
+  border-color: color-mix(in srgb, var(--border) 80%, transparent) !important;
+}
+
+.exec-details-grid .detail-block {
+  .block-title {
+    color: var(--text-muted);
+  }
+
+  pre {
+    background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+    color: var(--text-secondary);
+  }
+}
+
+.templates-grid .tmpl-card {
+  &__header {
+    .category {
+      color: var(--accent);
+    }
+
+    h3 {
+      color: var(--text-primary);
+    }
+  }
+
+  &__desc {
+    color: var(--text-secondary);
+  }
+
+  &__footer button {
+    background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+    border-color: var(--border);
+    color: var(--text-primary);
+    border-radius: 999px;
+
+    &:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+  }
+}
+
+.approvals-view {
+  .approval-card {
+    border-color: color-mix(in srgb, var(--warning) 30%, var(--border)) !important;
+
+    &__header {
+      h3 {
+        color: var(--warning);
+      }
+
+      .time {
+        color: var(--text-muted);
+      }
+    }
+
+    p {
+      color: var(--text-secondary);
+
+      code {
+        background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+        color: var(--text-primary);
+      }
+    }
+
+    .decision-form input {
+      background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+      border-color: var(--border);
+      color: var(--text-primary);
+    }
+  }
+
+  .empty-state {
+    h3 {
+      color: var(--text-primary);
+    }
+
+    p {
+      color: var(--text-secondary);
+    }
+  }
+}
+
+.trace-header-row {
+  h3 {
+    color: var(--text-primary);
+    letter-spacing: 0;
+  }
+
+  .trace-badge {
+    background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+    border-color: var(--border);
+    color: var(--text-secondary);
+  }
+}
+
+.node-inspector-header {
+  border-bottom-color: var(--border);
+
+  h4 {
+    color: var(--text-primary);
+  }
+}
+
+.meta-item,
+.detail-payload {
+  color: var(--text-secondary);
+
+  strong {
+    color: var(--text-primary);
+  }
+
+  pre {
+    color: var(--text-secondary);
+  }
+}
+
+.spinner-container {
+  .spinner {
+    border-color: color-mix(in srgb, var(--border) 70%, transparent);
+    border-top-color: var(--accent);
+  }
+
+  p {
+    color: var(--text-secondary);
   }
 }

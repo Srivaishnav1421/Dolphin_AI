@@ -39,7 +39,7 @@ export interface FeedItem {
     </div>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .ui-feed {
       display: flex;

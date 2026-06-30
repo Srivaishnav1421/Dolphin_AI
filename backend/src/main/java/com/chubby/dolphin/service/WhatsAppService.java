@@ -5,6 +5,7 @@ import com.chubby.dolphin.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class WhatsAppService {
     private final WebClient webClient;
     private final ObjectMapper mapper;
     private final LeadPipelineTrackingService leadPipelineTrackingService;
+    private final LocalApprovalSafetyService localApprovalSafetyService;
 
     public WhatsAppService(WhatsAppMessageRepository messageRepo,
                              WhatsAppTemplateRepository templateRepo,
@@ -37,6 +39,20 @@ public class WhatsAppService {
                              AlertService alertService,
                              ObjectMapper mapper,
                              LeadPipelineTrackingService leadPipelineTrackingService) {
+        this(messageRepo, templateRepo, configRepo, leadRepo, interactionRepo, alertService, mapper,
+                leadPipelineTrackingService, null);
+    }
+
+    @Autowired
+    public WhatsAppService(WhatsAppMessageRepository messageRepo,
+                             WhatsAppTemplateRepository templateRepo,
+                             WorkspaceConfigRepository configRepo,
+                             LeadRepository leadRepo,
+                             LeadInteractionRepository interactionRepo,
+                             AlertService alertService,
+                             ObjectMapper mapper,
+                             LeadPipelineTrackingService leadPipelineTrackingService,
+                             LocalApprovalSafetyService localApprovalSafetyService) {
         this.messageRepo = messageRepo;
         this.templateRepo = templateRepo;
         this.configRepo = configRepo;
@@ -45,6 +61,7 @@ public class WhatsAppService {
         this.alertService = alertService;
         this.mapper = mapper;
         this.leadPipelineTrackingService = leadPipelineTrackingService;
+        this.localApprovalSafetyService = localApprovalSafetyService;
         this.webClient = WebClient.builder()
                 .defaultHeader("Content-Type", "application/json")
                 .build();
@@ -57,6 +74,16 @@ public class WhatsAppService {
         log.info("📞 Initiating auto-WhatsApp response for Lead: {} via template: {}", lead.getId(), templateName);
 
         String workspaceId = lead.getWorkspaceId() != null ? lead.getWorkspaceId() : lead.getAccountId();
+        if (localSafetyBlocks("WHATSAPP_SEND")) {
+            localApprovalSafetyService.auditBlockedExecution(
+                    workspaceId,
+                    "WHATSAPP_SEND",
+                    "Lead",
+                    lead.getId(),
+                    "Template send blocked before Meta Cloud API call; template=" + templateName
+            );
+            return false;
+        }
         WorkspaceConfig config = configRepo.findByWorkspaceId(workspaceId).orElse(null);
 
         if (config == null || config.getWhatsappPhoneId() == null || config.getWhatsappToken() == null) {
@@ -212,6 +239,16 @@ public class WhatsAppService {
     @Scheduled(cron = "0 0 10 * * *")
     public void executeFollowUpSequences() {
         log.info("⏰ Running Scheduled WhatsApp Follow-up cycle...");
+        if (localSafetyBlocks("WHATSAPP_FOLLOW_UP_SCHEDULER")) {
+            localApprovalSafetyService.auditBlockedExecution(
+                    null,
+                    "WHATSAPP_FOLLOW_UP_SCHEDULER",
+                    "Lead",
+                    null,
+                    "Scheduled WhatsApp follow-up cycle blocked before lead/message mutations."
+            );
+            return;
+        }
         LocalDateTime targetTime = LocalDateTime.now().minusHours(24);
 
         // Find leads created before 24h that haven't opted out and haven't replied
@@ -242,5 +279,9 @@ public class WhatsAppService {
                 );
             }
         }
+    }
+
+    private boolean localSafetyBlocks(String action) {
+        return localApprovalSafetyService != null && localApprovalSafetyService.shouldRequireApprovalOnly(action);
     }
 }

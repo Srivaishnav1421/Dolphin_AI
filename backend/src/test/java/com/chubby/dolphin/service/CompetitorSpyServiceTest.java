@@ -60,41 +60,17 @@ public class CompetitorSpyServiceTest {
     }
 
     @Test
-    public void testSpyOnCompetitorFallback_GeneratesMockAds() {
+    public void testSpyOnCompetitorWithoutMetaConnectionReturnsEmpty() {
         String workspaceId = "ws-111";
         String keyword = "Organic Coffee";
 
-        String simulatedJson = """
-            {
-              "ads": [
-                {
-                  "brand_name": "Eco Brew",
-                  "ad_text": "Taste the pure organic coffee direct from hills of Coorg.",
-                  "format": "VIDEO",
-                  "hook_type": "STATEMENT",
-                  "offer_type": "DISCOUNT",
-                  "emotion": "JOY",
-                  "quality_score": 8
-                }
-              ]
-            }
-            """;
-
-        BusinessLlmFacadeService.LlmResponse mockLlmResponse = new BusinessLlmFacadeService.LlmResponse(simulatedJson, "GEMINI", "gemini-1.5-pro");
-        when(llmRouter.ask(anyString())).thenReturn(mockLlmResponse);
-
         when(metaConnRepo.findFirstByAccountIdAndTokenStatus(workspaceId, "VALID")).thenReturn(Optional.empty());
-        when(adRepo.save(any(CompetitorAd.class))).thenAnswer(i -> i.getArgument(0));
 
         List<CompetitorAd> results = service.spyOnCompetitor(workspaceId, keyword);
 
         assertNotNull(results);
-        assertEquals(1, results.size());
-        CompetitorAd ad = results.get(0);
-        assertEquals("Eco Brew", ad.getPageName());
-        assertEquals("Taste the pure organic coffee direct from hills of Coorg.", ad.getAdText());
-        assertEquals("VIDEO", ad.getFormat());
-        assertEquals(8, ad.getQualityScore());
-        verify(adRepo, times(1)).save(any(CompetitorAd.class));
+        assertTrue(results.isEmpty());
+        verify(adRepo, never()).save(any(CompetitorAd.class));
+        verify(llmRouter, never()).ask(anyString());
     }
 }

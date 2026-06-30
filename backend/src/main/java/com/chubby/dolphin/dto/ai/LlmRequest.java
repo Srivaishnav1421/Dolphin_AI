@@ -16,5 +16,6 @@ public class LlmRequest {
     private Double temperature;
     private Integer maxTokens;
     private AiPurpose purpose;
+    private String taskKey;
     private String workspaceId;
 }

@@ -2,16 +2,16 @@
   <div class="page-header">
     <div>
       <h1>Campaigns</h1>
-      <p>All Meta ad campaigns — managed & evaluated by the Brain</p>
+      <p>Run better campaigns with clear spend, lead, revenue, and next-action guidance.</p>
     </div>
-    <div style="display:flex;gap:10px;align-items:center">
+    <div class="action-row">
       @if (message()) { <span class="msg-chip animate-fade-in" [style.color]="message().startsWith('✅') ? 'var(--success)' : 'var(--warning)'">{{ message() }}</span> }
       <button class="btn btn-primary" (click)="evaluate()" [disabled]="evaluating()">
         @if (evaluating()) { <span class="spinner-sm"></span> Evaluating… }
-        @else { 🧠 Run Brain Eval }
+        @else { Review campaigns }
       </button>
-      <button class="btn btn-success" (click)="openForm()">＋ New Campaign</button>
-      <button class="btn btn-ghost" (click)="load()">↺ Refresh</button>
+      <button class="btn btn-success" (click)="openForm()">New campaign</button>
+      <button class="btn btn-ghost" (click)="load()">Refresh</button>
     </div>
   </div>
 
@@ -20,7 +20,7 @@
     <div class="modal-overlay animate-fade-in" (click)="closeForm()">
       <div class="modal-box" (click)="$event.stopPropagation()">
         <div class="modal-header">
-          <h3>＋ New Campaign</h3>
+          <h3>New campaign</h3>
           <button class="modal-close" (click)="closeForm()">✕</button>
         </div>
         <div class="form-grid">
@@ -39,11 +39,19 @@
             <input class="input" type="number" [(ngModel)]="form.budget" placeholder="50000" />
           </div>
           <div class="form-group">
-            <label>CTR (%)</label>
+            <label>Target CPL (₹) *</label>
+            <input class="input" type="number" [(ngModel)]="form.target_cpl" placeholder="850" />
+          </div>
+          <div class="form-group form-full">
+            <label>Description</label>
+            <textarea class="input" [(ngModel)]="form.description" rows="3" placeholder="Local campaign verification record"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Actual CTR (%)</label>
             <input class="input" type="number" step="0.01" [(ngModel)]="form.ctr" placeholder="2.5" />
           </div>
           <div class="form-group">
-            <label>CPL (₹)</label>
+            <label>Actual CPL (₹)</label>
             <input class="input" type="number" [(ngModel)]="form.cpl" placeholder="850" />
           </div>
           <div class="form-group">
@@ -58,7 +66,7 @@
         <div class="modal-footer">
           <button class="btn btn-ghost" (click)="closeForm()">Cancel</button>
           <button class="btn btn-primary" (click)="createCampaign()" [disabled]="saving()">
-            @if (saving()) { Saving… } @else { ✅ Create Campaign }
+            @if (saving()) { Saving… } @else { Create campaign }
           </button>
         </div>
       </div>
@@ -81,9 +89,10 @@
                 <th>Status</th>
                 <th>Objective</th>
                 <th>Budget</th>
+                <th>Target CPL</th>
                 <th>Spent</th>
                 <th>CTR</th>
-                <th>CPL</th>
+                <th>Actual CPL</th>
                 <th>ROAS</th>
                 <th>Score</th>
                 <th>Actions</th>
@@ -96,18 +105,19 @@
                   <td><span class="badge {{ c.status.toLowerCase() }}">{{ c.status }}</span></td>
                   <td><span class="badge info">{{ c.objective }}</span></td>
                   <td>₹{{ c.budget | number:'1.0-0' }}</td>
-                  <td>₹{{ c.spent | number:'1.0-0' }}</td>
-                  <td>{{ c.ctr | number:'1.2-2' }}%</td>
-                  <td>₹{{ c.cpl | number:'1.0-0' }}</td>
-                  <td [style.color]="c.roas >= 2 ? 'var(--success)' : 'var(--warning)'">
-                    {{ c.roas | number:'1.2-2' }}x
+                  <td>{{ moneyValue(c.target_cpl) }}</td>
+                  <td>{{ moneyValue(c.spent) }}</td>
+                  <td>{{ percentValue(c.ctr) }}</td>
+                  <td>{{ moneyValue(c.cpl) }}</td>
+                  <td [style.color]="c.roas !== null && c.roas !== undefined && c.roas >= 2 ? 'var(--success)' : 'var(--text-muted)'">
+                    {{ multiplierValue(c.roas) }}
                   </td>
                   <td>
                     <div class="score-pill"
-                         [style.background]="scoreColor(c.performance_score) + '22'"
-                         [style.color]="scoreColor(c.performance_score)"
-                         [style.border]="'1px solid ' + scoreColor(c.performance_score) + '44'">
-                      {{ c.performance_score }}
+                         [style.background]="scoreColor(scoreValue(c)) + '22'"
+                         [style.color]="scoreColor(scoreValue(c))"
+                         [style.border]="'1px solid ' + scoreColor(scoreValue(c)) + '44'">
+                      {{ scoreLabel(c) }}
                     </div>
                   </td>
                   <td>
@@ -123,11 +133,11 @@
                   </td>
                 </tr>
               } @empty {
-                <tr><td colspan="10">
+                <tr><td colspan="11">
                   <div class="empty-state">
                     <div class="icon">📢</div>
                     <p>No campaigns yet</p>
-                    <button class="btn btn-primary" style="margin-top:12px" (click)="openForm()">＋ Create your first campaign</button>
+                    <button class="btn btn-primary" style="margin-top:12px" (click)="openForm()">Create your first campaign</button>
                   </div>
                 </td></tr>
               }
@@ -141,7 +151,7 @@
         <div class="inspector-drawer card animate-slide-up" style="display:flex; flex-direction:column; gap:16px; padding:16px;">
           
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h3 style="margin:0; font-size:15px; font-weight:700;">Campaign Inspector</h3>
+            <h3 style="margin:0; font-size:15px; font-weight:700;">Campaign details</h3>
             <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" (click)="selected.set(null)">✕ Close</button>
           </div>
 
@@ -149,28 +159,55 @@
           <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Health Status</span>
-              <span class="badge" [style.background]="getHealth(campaign.performance_score).color + '22'" [style.color]="getHealth(campaign.performance_score).color">
-                {{ getHealth(campaign.performance_score).label }}
+              <span class="badge" [style.background]="getHealth(scoreValue(campaign)).color + '22'" [style.color]="getHealth(scoreValue(campaign)).color">
+                {{ getHealth(scoreValue(campaign)).label }}
               </span>
             </div>
             <div style="font-size:11px; color:var(--text-muted); line-height:1.4;">
-              Performance Index is currently <strong>{{ campaign.performance_score || '0' }} / 100</strong>.
+              @if (scoreValue(campaign) === null) {
+                No Math Engine score has been stored for this campaign yet.
+              } @else {
+                Performance Index is currently <strong>{{ scoreValue(campaign) | number:'1.1-1' }} / 100</strong>.
+              }
+            </div>
+            @if (scoreBreakdown(campaign); as breakdown) {
+              <div class="math-breakdown">
+                <div><span>Base</span><strong>{{ breakdown['base'] | number:'1.1-1' }}</strong></div>
+                <div><span>CTR</span><strong>{{ breakdown['ctrScore'] | number:'1.1-1' }}</strong></div>
+                <div><span>CPL</span><strong>{{ breakdown['cplScore'] | number:'1.1-1' }}</strong></div>
+                <div><span>Conversions</span><strong>{{ breakdown['conversionScore'] | number:'1.1-1' }}</strong></div>
+                <div><span>Penalty</span><strong>{{ breakdown['penalty'] | number:'1.1-1' }}</strong></div>
+              </div>
+            }
+            <div class="math-explanations">
+              @for (line of scoreExplanation(campaign); track line) {
+                <p>{{ line }}</p>
+              }
             </div>
           </div>
 
           <!-- Section 2: Budget Controls -->
           <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
-            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Budget Target Controls</span>
+              <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Budget</span>
             <div style="display:flex; gap:8px; align-items:center;">
               <span style="font-size:12px; color:var(--text-muted);">Budget:</span>
               <input class="input" type="number" style="height:30px; font-size:12px; flex:1;" [(ngModel)]="editBudgetVal" />
               <button class="btn btn-primary" style="height:30px; font-size:11px; padding:0 10px;" (click)="saveBudget()">Save</button>
             </div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
+              <span>Target CPL:</span>
+              <strong style="color:var(--text-primary);">{{ moneyValue(campaign.target_cpl) }}</strong>
+            </div>
+            @if (campaign.description) {
+              <div style="font-size:12px; color:var(--text-muted); line-height:1.4;">
+                {{ campaign.description }}
+              </div>
+            }
           </div>
 
           <!-- Section 3: AI Recommendations -->
           <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
-            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">AI Autonomy Decisions</span>
+            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Recommended actions</span>
             <div class="recommendations-list" style="display:flex; flex-direction:column; gap:8px; max-height:120px; overflow-y:auto;">
               @for (r of recommendations(); track r.id) {
                 <div style="font-size:12px; border-left:2px solid var(--accent); padding-left:8px;">
@@ -179,21 +216,21 @@
                   <div style="font-size:10px; color:var(--text-muted);">Status: {{ r.status }}</div>
                 </div>
               } @empty {
-                <div style="font-size:11px; color:var(--text-muted);">No active brain recommendations for this campaign.</div>
+                <div style="font-size:11px; color:var(--text-muted);">No active recommendations for this campaign.</div>
               }
             </div>
           </div>
 
           <!-- Section 4: Creative Performance -->
           <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
-            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Creative CTR Performance</span>
+            <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Creative performance</span>
             <div class="creatives-list" style="display:flex; flex-direction:column; gap:8px; max-height:120px; overflow-y:auto;">
               @for (cr of creatives(); track cr.id) {
                 <div style="font-size:12px; padding:6px; background:rgba(0,0,0,0.1); border-radius:4px;">
                   <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-primary);">{{ cr.headline || 'Creative Headline' }}</div>
                   <div style="display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-muted); margin-top:2px;">
-                    <span>Pred CTR: {{ cr.predicted_ctr || 2.1 }}%</span>
-                    <span>Actual CTR: {{ cr.actual_ctr || 2.4 }}%</span>
+                    <span>Pred CTR: {{ cr.predicted_ctr ? (cr.predicted_ctr + '%') : 'No score yet' }}</span>
+                    <span>Actual CTR: {{ cr.actual_ctr ? (cr.actual_ctr + '%') : 'No actual CTR yet' }}</span>
                   </div>
                 </div>
               } @empty {
@@ -202,12 +239,12 @@
             </div>
           </div>
 
-          <!-- Section 5: Audience Insights -->
+          <!-- Section 5: Audience Insights (real data from Meta Ads connection) -->
           <div class="inspector-card" style="background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:4px; font-size:11.5px; line-height:1.4;">
             <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Audience Insights</span>
-            <div><span style="color:var(--text-muted);">Placements:</span> Instagram Stories (48%), Facebook Feed (32%), Reels (20%)</div>
-            <div><span style="color:var(--text-muted);">Demographics:</span> 25-34 Age bracket makes up 62% conversion rate</div>
-            <div><span style="color:var(--text-muted);">Geographies:</span> Metro Tier 1 Areas</div>
+            <div style="font-size:11px; color:var(--text-muted); font-style:italic;">
+              Connect Meta Ads to see real placement breakdowns, demographics, and geographic performance for this campaign.
+            </div>
           </div>
 
         </div>

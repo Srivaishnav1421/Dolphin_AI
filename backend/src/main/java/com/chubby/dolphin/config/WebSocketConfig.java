@@ -2,6 +2,7 @@ package com.chubby.dolphin.config;
 
 import com.chubby.dolphin.security.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -14,15 +15,23 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.web.socket.config.annotation.*;
 
+import java.util.Arrays;
+
 @Configuration
 @EnableWebSocketMessageBroker
 @Slf4j
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtUtil jwtUtil;
+    private final String[] allowedOriginPatterns;
 
-    public WebSocketConfig(JwtUtil jwtUtil) {
+    public WebSocketConfig(JwtUtil jwtUtil,
+                           @Value("${cors.allowed-origins:http://localhost:4200}") String allowedOrigins) {
         this.jwtUtil = jwtUtil;
+        this.allowedOriginPatterns = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toArray(String[]::new);
     }
 
     @Override
@@ -34,9 +43,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws/brain")
-                .setAllowedOriginPatterns("http://localhost:4200", "https://*");
+                .setAllowedOriginPatterns(allowedOriginPatterns);
         registry.addEndpoint("/ws/brain")
-                .setAllowedOriginPatterns("http://localhost:4200", "https://*")
+                .setAllowedOriginPatterns(allowedOriginPatterns)
                 .withSockJS();  // SockJS fallback for Firefox
     }
 

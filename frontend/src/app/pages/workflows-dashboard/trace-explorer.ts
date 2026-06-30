@@ -39,7 +39,7 @@ export interface TraceGroupItem {
     </div>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .trace-explorer {
       width: 100%;

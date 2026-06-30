@@ -1,0 +1,10 @@
+<main class="db-unavailable">
+  <section class="db-unavailable__panel">
+    <span class="db-unavailable__eyebrow">Live data blocked</span>
+    <h1>Database connection unavailable. Live business data cannot be loaded.</h1>
+    <p>{{ message }}</p>
+    <button class="btn btn-primary" type="button" (click)="checkAgain()" [disabled]="checking">
+      {{ checking ? 'Checking...' : 'Check again' }}
+    </button>
+  </section>
+</main>

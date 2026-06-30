@@ -23,15 +23,17 @@ public class CreativeFatigueServiceTest {
     @Mock private MetaAdsService metaAdsService;
     @Mock private BrainDecisionRepository decisionRepo;
     @Mock private AlertService alertService;
+    @Mock private LocalApprovalSafetyService localApprovalSafetyService;
 
     private CreativeFatigueService service;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(localApprovalSafetyService.shouldRequireApprovalOnly(anyString())).thenReturn(false);
         service = new CreativeFatigueService(
                 creativeRepo, metricRepo, fatigueAlertRepo, campaignRepo,
-                metaConnRepo, metaAdsService, decisionRepo, alertService
+                metaConnRepo, metaAdsService, decisionRepo, alertService, localApprovalSafetyService
         );
     }
 
@@ -97,5 +99,39 @@ public class CreativeFatigueServiceTest {
         verify(creativeRepo, times(1)).save(argThat(c -> "creative-1".equals(c.getId()) && "PAUSED".equals(c.getStatus())));
         // Verify decision logged
         verify(decisionRepo, times(1)).save(any(BrainDecision.class));
+    }
+
+    @Test
+    public void testHandleFatigueAlertBlockedInLocalModeBeforeMetaOrCreativeMutation() {
+        String campaignId = "camp-123";
+        String accountId = "acc-456";
+
+        Campaign campaign = new Campaign();
+        campaign.setId(campaignId);
+        campaign.setAccountId(accountId);
+        campaign.setName("Test Campaign");
+        when(campaignRepo.findById(campaignId)).thenReturn(Optional.of(campaign));
+        when(localApprovalSafetyService.shouldRequireApprovalOnly("CREATIVE_FATIGUE_ROTATION")).thenReturn(true);
+
+        FatigueAlert alert = new FatigueAlert();
+        alert.setId("alert-123");
+        alert.setCampaignId(campaignId);
+        alert.setCreativeId("creative-1");
+
+        service.handleFatigueAlert(alert);
+
+        verify(localApprovalSafetyService).auditBlockedExecution(
+                eq(accountId),
+                eq("CREATIVE_FATIGUE_ROTATION"),
+                eq("FatigueAlert"),
+                eq("alert-123"),
+                contains("blocked before Meta pause/resume")
+        );
+        verify(creativeRepo, never()).findByCampaignIdAndStatus(anyString(), anyString());
+        verify(metaConnRepo, never()).findFirstByAccountIdAndTokenStatus(anyString(), anyString());
+        verify(metaAdsService, never()).resumeCampaign(any(), anyString());
+        verify(metaAdsService, never()).pauseCampaign(any(), anyString());
+        verify(creativeRepo, never()).save(any());
+        verify(decisionRepo, never()).save(any());
     }
 }

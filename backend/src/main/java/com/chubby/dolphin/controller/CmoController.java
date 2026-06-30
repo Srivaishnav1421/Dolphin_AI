@@ -3,6 +3,8 @@ package com.chubby.dolphin.controller;
 import com.chubby.dolphin.brain.BrainGovernanceService;
 import com.chubby.dolphin.brain.strategy.*;
 import com.chubby.dolphin.brain.strategy.dto.*;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +18,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/cmo")
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @AllArgsConstructor
 @Slf4j
 public class CmoController {
@@ -28,13 +29,19 @@ public class CmoController {
     private final CmoMemoryService cmoMemoryService;
     private final BrainGovernanceService governanceService;
     private final com.chubby.dolphin.security.SecurityUtils sec;
+    private final com.chubby.dolphin.security.TenantAccessService tenantAccessService;
+    private final AccessControlService access;
 
     private String resolveWorkspaceId(String requestedWorkspaceId) {
         String active = sec.currentWorkspaceId();
         org.springframework.security.core.Authentication auth = 
             org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))) {
-            return requestedWorkspaceId != null && !requestedWorkspaceId.isBlank() ? requestedWorkspaceId : active;
+            if (requestedWorkspaceId != null && !requestedWorkspaceId.isBlank()) {
+                tenantAccessService.requireWorkspaceAccess(auth.getName(), requestedWorkspaceId);
+                return requestedWorkspaceId;
+            }
+            return active;
         }
         return active;
     }
@@ -44,6 +51,7 @@ public class CmoController {
             @RequestParam(value = "workspaceId", required = false) String workspaceId) {
         
         String targetWorkspace = resolveWorkspaceId(workspaceId);
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         log.info("🧠 Fetching AI Chief Marketing Officer (CMO) cockpit for workspace: {}", targetWorkspace);
 
         StrategicPlan plan = strategicGoalEngine.generatePlan(targetWorkspace);
@@ -68,18 +76,21 @@ public class CmoController {
     @GetMapping("/forecast")
     public ResponseEntity<RevenueForecast> getForecast(
             @RequestParam(value = "workspaceId", required = false) String workspaceId) {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         return ResponseEntity.ok(revenueForecastEngine.generateForecast(resolveWorkspaceId(workspaceId)));
     }
 
     @GetMapping("/strategy")
     public ResponseEntity<StrategicPlan> getStrategy(
             @RequestParam(value = "workspaceId", required = false) String workspaceId) {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         return ResponseEntity.ok(strategicGoalEngine.generatePlan(resolveWorkspaceId(workspaceId)));
     }
 
     @GetMapping("/competitors")
     public ResponseEntity<Map<String, Object>> getCompetitors(
             @RequestParam(value = "workspaceId", required = false) String workspaceId) {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         return ResponseEntity.ok(competitorMonitoringService.calculateThreats(resolveWorkspaceId(workspaceId)));
     }
 

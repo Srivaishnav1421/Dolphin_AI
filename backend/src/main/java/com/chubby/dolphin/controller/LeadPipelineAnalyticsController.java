@@ -3,6 +3,8 @@ package com.chubby.dolphin.controller;
 import com.chubby.dolphin.entity.SystemAlert;
 import com.chubby.dolphin.repository.LeadPipelineEventRepository;
 import com.chubby.dolphin.repository.SystemAlertRepository;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,18 +22,22 @@ public class LeadPipelineAnalyticsController {
     private final LeadPipelineEventRepository eventRepo;
     private final SystemAlertRepository alertRepo;
     private final SecurityUtils sec;
+    private final AccessControlService access;
 
     public LeadPipelineAnalyticsController(LeadPipelineEventRepository eventRepo,
                                             SystemAlertRepository alertRepo,
-                                            SecurityUtils sec) {
+                                            SecurityUtils sec,
+                                            AccessControlService access) {
         this.eventRepo = eventRepo;
         this.alertRepo = alertRepo;
         this.sec = sec;
+        this.access = access;
     }
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> getPipelineHealth() {
-        String workspaceId = sec.currentAccountId();
+        access.requireWorkspacePermission(Permission.LEAD_READ);
+        String workspaceId = sec.currentWorkspaceId();
 
         long totalEvents = eventRepo.countByWorkspaceIdAndEventType(workspaceId, "WEBHOOK_RECEIVED") +
                 eventRepo.countByWorkspaceIdAndEventType(workspaceId, "WORKSPACE_RESOLVED") +

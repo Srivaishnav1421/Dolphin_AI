@@ -1,0 +1,39 @@
+.db-unavailable {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg-primary);
+}
+
+.db-unavailable__panel {
+  width: min(560px, 100%);
+  padding: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  text-align: center;
+  box-shadow: var(--shadow-soft);
+}
+
+.db-unavailable__eyebrow {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.db-unavailable h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.db-unavailable p {
+  margin: 16px auto 24px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}

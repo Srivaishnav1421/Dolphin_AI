@@ -7,6 +7,7 @@ import java.util.Optional;
 
 public interface CampaignRepository extends JpaRepository<Campaign, String> {
     List<Campaign> findByWorkspaceId(String workspaceId);
+    long countByWorkspaceIdIn(List<String> workspaceIds);
     List<Campaign> findByWorkspaceIdAndStatus(String workspaceId, String status);
     Optional<Campaign> findByIdAndWorkspaceId(String id, String workspaceId);
     List<Campaign> findByStatus(String status);

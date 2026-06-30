@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dolphin-config
+data:
+  SPRING_PROFILES_ACTIVE: prod
+  SERVER_PORT: "8000"
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dolphindb
+  SPRING_DATASOURCE_USERNAME: dolphin
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  SPRING_RABBITMQ_HOST: rabbitmq
+  SPRING_RABBITMQ_PORT: "5672"
+  SPRING_RABBITMQ_USERNAME: dolphin
+  OLLAMA_BASE_URL: http://ollama:11434
+  OLLAMA_ENABLED: "false"
+  META_REDIRECT_URI: https://app.example.com/meta/callback
+  CORS_ORIGINS: https://app.example.com
+  STORAGE_BASE_DIR: /app/storage
+  ALERTS_ENABLED: "true"
+  REPORTS_ENABLED: "true"

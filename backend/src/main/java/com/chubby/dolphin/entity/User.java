@@ -41,6 +41,15 @@ public class User implements UserDetails {
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime lastLogin;
 
+    @Column(name = "two_factor_enabled", nullable = false)
+    private boolean twoFactorEnabled = false;
+
+    @Column(name = "two_factor_secret", length = 128)
+    private String twoFactorSecret;
+
+    @Column(name = "two_factor_enabled_at")
+    private LocalDateTime twoFactorEnabledAt;
+
     // ── UserDetails impl ──────────────────────────────────────────
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

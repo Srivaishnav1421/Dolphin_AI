@@ -1,25 +1,25 @@
 <div class="page animate-fade-in">
   <div class="page-header">
     <div>
-      <h1>Lead Center</h1>
-      <p>Capture, qualify, follow up, and convert leads from every channel</p>
+      <h1>CRM</h1>
+      <p>Turn every enquiry into a clear next step: qualify, follow up, assign, and convert.</p>
     </div>
-    <div style="display:flex;gap:10px;align-items:center">
+    <div class="action-row">
       <!-- Toggle between Kanban and List view -->
-      <div class="btn-group" style="display:flex;border:1px solid var(--border);border-radius:20px;overflow:hidden;background:var(--bg-surface);">
-        <button class="btn btn-ghost" [class.active-btn]="viewMode() === 'KANBAN'" (click)="setViewMode('KANBAN')" style="border-radius:0;border:none;font-size:12px;padding:6px 14px;">
-          <span class="material-symbols-outlined font-icon" style="font-size:16px;margin-right:4px;">view_kanban</span> Kanban
+      <div class="segmented-control">
+        <button class="btn btn-ghost" [class.active-btn]="viewMode() === 'KANBAN'" (click)="setViewMode('KANBAN')">
+          <app-icon name="grid_view" [size]="16"></app-icon> Kanban
         </button>
-        <button class="btn btn-ghost" [class.active-btn]="viewMode() === 'LIST'" (click)="setViewMode('LIST')" style="border-radius:0;border:none;font-size:12px;padding:6px 14px;">
-          <span class="material-symbols-outlined font-icon" style="font-size:16px;margin-right:4px;">table_rows</span> Table
+        <button class="btn btn-ghost" [class.active-btn]="viewMode() === 'LIST'" (click)="setViewMode('LIST')">
+          <app-icon name="analytics" [size]="16"></app-icon> List
         </button>
       </div>
 
       @if (message()) {
-        <span class="msg-chip animate-fade-in" [style.color]="message().startsWith('✅') ? 'var(--success)' : 'var(--warning)'">{{ message() }}</span>
+        <span class="msg-chip animate-fade-in" [class.msg-chip--success]="messageTone() === 'success'" [class.msg-chip--error]="messageTone() === 'error'">{{ message() }}</span>
       }
       <button class="btn btn-primary" (click)="openForm()">Add Lead</button>
-      <button class="btn btn-ghost" (click)="load()">↺ Refresh</button>
+      <button class="btn btn-ghost" (click)="load()">Refresh</button>
     </div>
   </div>
 
@@ -28,13 +28,21 @@
     <div class="modal-overlay animate-fade-in" (click)="closeForm()">
       <div class="modal-box" (click)="$event.stopPropagation()">
         <div class="modal-header">
-          <h3>Add and qualify lead</h3>
-          <button class="modal-close" (click)="closeForm()">✕</button>
+          <h3>Add lead</h3>
+          <button class="modal-close" (click)="closeForm()" aria-label="Close lead form">Close</button>
         </div>
         <div class="form-grid">
           <div class="form-group form-full">
             <label>Lead Name *</label>
             <input class="input" [(ngModel)]="form.name" placeholder="e.g. Ravi Kumar" />
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input class="input" [(ngModel)]="form.phone" placeholder="+91..." />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input class="input" [(ngModel)]="form.email" placeholder="lead@example.com" />
           </div>
           <div class="form-group form-full">
             <label>Lead Message / Enquiry *</label>
@@ -49,12 +57,12 @@
           </div>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin:0 24px 16px;padding:10px;background:rgba(0,212,255,0.05);border-radius:8px;border:1px solid rgba(0,212,255,0.1)">
-          AI will analyze the enquiry and suggest lead quality, priority, and next action in business language.
+          DolphinAI will calculate a deterministic Lead Score from the real fields you provide.
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" (click)="closeForm()">Cancel</button>
           <button class="btn btn-primary" (click)="submitLead()" [disabled]="scoring()">
-            @if (scoring()) { <span class="spinner-sm"></span> Analyzing lead… } @else { Save and qualify lead }
+            @if (scoring()) { <span class="spinner-sm"></span> Saving lead… } @else { Save lead }
           </button>
         </div>
       </div>
@@ -93,7 +101,8 @@
             @for (lead of leads(); track lead.id) {
               <div class="lead-card animate-slide-up" [class.lead-card--selected]="selected()?.id === lead.id" (click)="select(lead)">
                 <div class="lead-card__top">
-                  <span class="badge {{ lead.status.toLowerCase() }}">{{ lead.status }}</span>
+                  <span class="badge {{ statusClass(lead) }}">{{ temperatureLabel(lead) }}</span>
+                  <span style="font-size:11px;color:var(--text-muted)">{{ statusLabel(lead) }}</span>
                   <span class="lead-card__time">{{ lead.created_at | date:'dd MMM, HH:mm' }}</span>
                 </div>
                 <div class="lead-card__name">{{ lead.name }}</div>
@@ -102,12 +111,12 @@
                   <div class="score-track">
                     <div class="score-fill" [style.width.%]="scoreBar(lead.score)" [style.background]="scoreColor(lead.score)"></div>
                   </div>
-                  <span class="score-val" [style.color]="scoreColor(lead.score)">{{ lead.score | number:'1.2-2' }}</span>
+                  <span class="score-val" [style.color]="scoreColor(lead.score)">{{ safeScore(lead.score) | number:'1.2-2' }}</span>
                 </div>
               </div>
             } @empty {
               <div class="empty-state">
-                <div class="icon">🔥</div>
+                <div class="icon"><app-icon name="group" [size]="22"></app-icon></div>
                 <p>No leads found matching filters.</p>
               </div>
             }
@@ -136,16 +145,13 @@
                       <div class="lead-card__msg" style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:8px;">{{ lead.message }}</div>
                       
                       <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span class="badge {{ lead.status.toLowerCase() }}" style="font-size:9px;padding:1px 5px;">{{ (lead.score * 100).toFixed(0) }}% AI</span>
+                        <span class="badge {{ statusClass(lead) }}" style="font-size:9px;padding:1px 5px;">{{ scorePct(lead.score) }}% score</span>
                         <!-- Visual mover buttons -->
                         <div class="kanban-move-actions" (click)="$event.stopPropagation()" style="display:flex;gap:4px;">
-                          <select class="input" style="height:20px;padding:0 2px;font-size:9px;width:75px;" [ngModel]="stage" (ngModelChange)="moveLead(lead, $event)">
-                            <option value="NEW">New</option>
-                            <option value="CONTACTED">Contacted</option>
-                            <option value="QUALIFIED">Qualified</option>
-                            <option value="PROPOSAL">Proposal</option>
-                            <option value="WON">Won</option>
-                            <option value="LOST">Lost</option>
+                          <select class="input" style="height:24px;padding:0 6px;font-size:10px;width:112px;" [ngModel]="stage" (ngModelChange)="moveLead(lead, $event)">
+                            @for (option of stageOptions; track option.value) {
+                              <option [value]="option.value">{{ option.label }}</option>
+                            }
                           </select>
                         </div>
                       </div>
@@ -172,26 +178,43 @@
             
             <div class="detail-header-row" style="display:flex;justify-content:space-between;align-items:center;">
               <h3 class="detail-title" style="margin:0;">Lead Details</h3>
-              <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px;" (click)="selected.set(null)">✕ Close</button>
+              <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px;" (click)="selected.set(null)">Close</button>
             </div>
 
-            <!-- Card 1: AI Lead Scoring Info -->
+            <!-- Card 1: Lead Scoring Info -->
             <div class="detail-card-panel" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:12px;">
-              <h4 class="detail-sub" style="margin-top:0;margin-bottom:8px;color:var(--danger);font-size:11px;">🧠 AI Lead Qualification</h4>
+              <h4 class="detail-sub" style="margin-top:0;margin-bottom:8px;color:var(--accent);font-size:11px;">Lead Score</h4>
               
               <div class="scoring-metric" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                 <span style="font-size:12px;color:var(--text-muted);">Lead Score:</span>
-                <strong [style.color]="scoreColor(l.score)" style="font-size:15px;">{{ (l.score * 100).toFixed(0) }}%</strong>
+                <strong [style.color]="scoreColor(l.score)" style="font-size:15px;">{{ scorePct(l.score) }}%</strong>
               </div>
 
               <div class="scoring-metric" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <span style="font-size:12px;color:var(--text-muted);">Buying Intent:</span>
-                <span class="badge warm" style="font-size:10px;text-transform:uppercase;">{{ l.intent_signal || 'Medium' }}</span>
+                <span style="font-size:12px;color:var(--text-muted);">Status:</span>
+                <span style="font-size:11px;font-weight:600;text-transform:uppercase;">{{ statusLabel(l) }}</span>
+              </div>
+
+              <div class="scoring-metric" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:12px;color:var(--text-muted);">Temperature:</span>
+                <span class="badge {{ statusClass(l) }}" style="font-size:10px;text-transform:uppercase;">{{ temperatureLabel(l) }}</span>
               </div>
 
               <div class="scoring-metric" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                 <span style="font-size:12px;color:var(--text-muted);">Probability to Convert:</span>
-                <strong style="font-size:13px;color:var(--text-primary);">{{ (l.score * 100).toFixed(0) }}%</strong>
+                <strong style="font-size:13px;color:var(--text-primary);">{{ conversionPct(l) }}%</strong>
+              </div>
+
+              <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+                <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;">Score Breakdown:</div>
+                @for (row of scoreBreakdownRows(l); track row.label) {
+                  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:3px;">
+                    <span>{{ row.label }}</span>
+                    <strong>{{ row.value }}/{{ row.max }}</strong>
+                  </div>
+                } @empty {
+                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Score breakdown loads when a lead is selected.</div>
+                }
               </div>
 
               <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
@@ -199,40 +222,44 @@
                 <div style="font-size:12px;color:var(--text-primary);line-height:1.4;background:rgba(0,0,0,0.15);padding:8px;border-radius:6px;border-left:3px solid var(--accent);">
                   {{ getRecommendedAction(l) }}
                 </div>
+                <div style="font-size:11px;color:var(--text-muted);line-height:1.4;margin-top:8px;">
+                  WhatsApp setup required. This action will only be queued for approval.
+                </div>
+                <button class="btn btn-primary" style="margin-top:8px;width:100%;font-size:12px;" (click)="submitFollowupApproval()" [disabled]="submittingApproval()">
+                  @if (submittingApproval()) { <span class="spinner-sm"></span> Queuing } @else { Submit follow-up for approval }
+                </button>
               </div>
             </div>
 
             <!-- Card 2: Basic Info Signals -->
             <div class="signals-group" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
               <div class="signal" style="padding:6px 10px;background:var(--bg-surface);border-radius:6px;display:flex;flex-direction:column;gap:2px;">
-                <span style="font-size:10px;color:var(--text-muted);">💰 Budget</span>
+                <span style="font-size:10px;color:var(--text-muted);">Budget</span>
                 <span style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ l.budget_signal || '—' }}</span>
               </div>
               <div class="signal" style="padding:6px 10px;background:var(--bg-surface);border-radius:6px;display:flex;flex-direction:column;gap:2px;">
-                <span style="font-size:10px;color:var(--text-muted);">⏰ Timeline</span>
+                <span style="font-size:10px;color:var(--text-muted);">Timeline</span>
                 <span style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ l.timeline_signal || '—' }}</span>
               </div>
               <div class="signal" style="padding:6px 10px;background:var(--bg-surface);border-radius:6px;display:flex;flex-direction:column;gap:2px;">
-                <span style="font-size:10px;color:var(--text-muted);">📍 Location</span>
+                <span style="font-size:10px;color:var(--text-muted);">Location</span>
                 <span style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ l.location_signal || '—' }}</span>
               </div>
               <div class="signal" style="padding:6px 10px;background:var(--bg-surface);border-radius:6px;display:flex;flex-direction:column;gap:2px;">
-                <span style="font-size:10px;color:var(--text-muted);">🔌 Source</span>
+                <span style="font-size:10px;color:var(--text-muted);">Source</span>
                 <span style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ l.source }}</span>
               </div>
             </div>
 
             <!-- Card 3: Interaction Timeline -->
             <div class="detail-card-panel" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;">
-              <h4 class="detail-sub" style="margin:0;color:var(--text-muted);font-size:11px;">⏱️ Interaction Timeline</h4>
+              <h4 class="detail-sub" style="margin:0;color:var(--text-muted);font-size:11px;">Interaction timeline</h4>
               
               <!-- Timeline stream -->
               <div class="timeline-stream" style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
                 @for (log of interactions(); track log.id) {
                   <div style="display:flex;gap:8px;font-size:11.5px;line-height:1.4;">
-                    <span class="material-symbols-outlined" style="font-size:14px;color:var(--accent);margin-top:2px;">
-                      {{ log.type === 'SYSTEM' ? 'info' : log.type === 'CALL' ? 'call' : log.type === 'EMAIL' ? 'mail' : 'groups' }}
-                    </span>
+                    <span style="color:var(--accent);margin-top:2px;"><app-icon [name]="interactionIcon(log.type)" [size]="14"></app-icon></span>
                     <div>
                       <span style="font-weight:600;color:var(--text-secondary);margin-right:4px;">[{{ log.type }}]</span>
                       <span style="color:var(--text-primary);">{{ log.notes }}</span>
@@ -256,15 +283,17 @@
               </div>
             </div>
 
-            <!-- Card 4: WhatsApp Conversational SDR Chat -->
+              <!-- Card 4: Conversation Notes -->
             <div class="detail-card-panel" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;">
               <h4 class="detail-sub" style="margin:0;display:flex;justify-content:space-between;align-items:center;font-size:11px;">
-                <span>💬 WhatsApp SDR Bot</span>
-                <span class="badge active" style="font-size:8px;padding:1px 4px;">Autonomous</span>
+                <span>Conversation notes</span>
+                <span class="badge" [class.active]="whatsAppConnected()" style="font-size:8px;padding:1px 4px;">
+                  {{ whatsAppConnected() ? 'WhatsApp connected' : 'Approval only' }}
+                </span>
               </h4>
 
               <div class="sdr-chat-history" style="max-height:165px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;">
-                <!-- First mock inbound inquiry message from the lead -->
+                <!-- Original inbound inquiry from the lead -->
                 <div class="chat-msg chat-msg--lead" style="align-self:flex-start;max-width:85%;background:rgba(255,255,255,0.06);padding:6px 10px;border-radius:8px 8px 8px 0;font-size:11px;">
                   <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px">Lead (Inbound)</div>
                   <div>{{ l.message }}</div>
@@ -280,7 +309,7 @@
                        [style.border-radius]="msg.sender === 'LEAD' ? '8px 8px 8px 0' : '8px 8px 0 8px'"
                        [style.font-size]="'11px'">
                     <div style="font-size:8px;margin-bottom:2px" [style.color]="msg.sender === 'LEAD' ? 'var(--text-muted)' : 'var(--primary)'">
-                      {{ msg.sender === 'LEAD' ? 'Lead' : '🤖 AI SDR Bot' }}
+                      {{ msg.sender === 'LEAD' ? 'Lead' : 'DolphinAI' }}
                     </div>
                     <div>{{ msg.message }}</div>
                   </div>
@@ -293,13 +322,13 @@
                        style="height:30px;font-size:11.5px" 
                        [(ngModel)]="newMessageText" 
                        (keyup.enter)="sendChatMessage()"
-                       placeholder="Simulate WhatsApp reply..." 
+                       placeholder="Record lead reply or note..." 
                        [disabled]="sendingMessage()" />
                 <button class="btn btn-primary" 
                         style="height:30px;padding:0 10px;font-size:11.5px;flex-shrink:0" 
                         (click)="sendChatMessage()"
                         [disabled]="sendingMessage() || !newMessageText().trim()">
-                  @if (sendingMessage()) { <span class="spinner-sm"></span> } @else { Send }
+                  @if (sendingMessage()) { <span class="spinner-sm"></span> } @else { Save note }
                 </button>
               </div>
             </div>
@@ -307,7 +336,7 @@
           </div>
         } @else {
           <div style="border: 1px dashed var(--border); border-radius: 8px; padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
-            Select a lead to inspect qualification scoring, log interaction notes, or converse via SDR bot.
+            Select a lead to inspect Lead Score, log interaction notes, or queue a follow-up for approval.
           </div>
         }
       </div>

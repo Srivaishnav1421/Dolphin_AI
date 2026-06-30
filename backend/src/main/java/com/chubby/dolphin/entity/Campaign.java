@@ -24,11 +24,13 @@ public class Campaign {
     private String objective;    // LEADS, CONVERSIONS, AWARENESS, TRAFFIC
 
     private Double budget;
+    private Double targetCpl;
     private Double spent;
     private Double ctr;
     private Double cpl;
     private Double roas;
     private Double performanceScore;
+    private String description;
 
     private Integer conversions = 0;
     private Integer daysOfData = 0;
@@ -67,6 +69,9 @@ public class Campaign {
     public Double getBudget() { return budget; }
     public void setBudget(Double budget) { this.budget = budget; }
 
+    public Double getTargetCpl() { return targetCpl; }
+    public void setTargetCpl(Double targetCpl) { this.targetCpl = targetCpl; }
+
     public Double getSpent() { return spent; }
     public void setSpent(Double spent) { this.spent = spent; }
 
@@ -81,6 +86,9 @@ public class Campaign {
 
     public Double getPerformanceScore() { return performanceScore; }
     public void setPerformanceScore(Double performanceScore) { this.performanceScore = performanceScore; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     public String getMetaCampaignId() { return metaCampaignId; }
     public void setMetaCampaignId(String metaCampaignId) { this.metaCampaignId = metaCampaignId; }

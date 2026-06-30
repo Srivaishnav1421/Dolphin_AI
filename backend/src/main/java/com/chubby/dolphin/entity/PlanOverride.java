@@ -30,9 +30,11 @@ public class PlanOverride {
     @Column(name = "limit_value")
     private Long limitValue;
 
+    @Builder.Default
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Builder.Default
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

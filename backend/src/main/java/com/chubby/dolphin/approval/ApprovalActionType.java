@@ -1,0 +1,19 @@
+package com.chubby.dolphin.approval;
+
+public enum ApprovalActionType {
+    PAUSE_CAMPAIGN,
+    RESUME_CAMPAIGN,
+    KILL_CAMPAIGN,
+    CHANGE_BUDGET,
+    CHANGE_OBJECTIVE,
+    APPROVE_CREATIVE,
+    PUBLISH_CREATIVE,
+    LAUNCH_CREATIVE,
+    SEND_WHATSAPP,
+    SEND_EMAIL,
+    CALL_LEAD,
+    FOLLOW_UP,
+    CHANGE_LEAD_STATUS,
+    EXECUTE_WORKFLOW,
+    OTHER
+}

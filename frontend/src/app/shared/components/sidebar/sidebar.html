@@ -5,7 +5,7 @@
     <div class="sidebar__logo-icon">🐬</div>
     <div class="sidebar__logo-text">
       <span class="sidebar__logo-name">DolphinAI</span>
-      <span class="sidebar__logo-tag">Enterprise AI</span>
+      <span class="sidebar__logo-tag">Grow Faster. Work Smarter.</span>
     </div>
   </div>
 
@@ -36,7 +36,7 @@
       >
         <span class="sidebar__link-icon">{{ item.icon }}</span>
         <span class="sidebar__link-label">{{ item.label }}</span>
-        @if (item.label === 'Ad Brain' && pendingCount() > 0) {
+        @if (item.label === 'Approval Queue' && pendingCount() > 0) {
           <span class="sidebar__badge">{{ pendingCount() }}</span>
         }
         <span class="sidebar__link-indicator"></span>

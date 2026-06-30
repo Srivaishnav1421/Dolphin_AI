@@ -30,22 +30,16 @@ public class MetaAudienceServiceTest {
     }
 
     @Test
-    public void testCreateCustomAudienceFallback_CreatesLocalRecord() {
+    public void testCreateCustomAudienceWithoutMetaConnectionFails() {
         String workspaceId = "ws-123";
         String name = "Test Custom Audience";
 
         when(metaConnRepo.findFirstByAccountIdAndTokenStatus(workspaceId, "VALID"))
                 .thenReturn(Optional.empty()); // No active meta connections
 
-        when(audienceRepo.save(any(MetaAudience.class))).thenAnswer(i -> i.getArgument(0));
-
-        MetaAudience result = service.createCustomAudience(workspaceId, name, "Fallback test");
-
-        assertNotNull(result);
-        assertEquals(name, result.getName());
-        assertEquals("CUSTOM", result.getAudienceType());
-        assertTrue(result.getMetaAudienceId().startsWith("mock-"));
-        verify(audienceRepo, times(1)).save(any(MetaAudience.class));
+        assertThrows(IllegalStateException.class,
+                () -> service.createCustomAudience(workspaceId, name, "Fallback test"));
+        verify(audienceRepo, never()).save(any(MetaAudience.class));
     }
 
     @Test
@@ -60,18 +54,11 @@ public class MetaAudienceServiceTest {
         when(audienceRepo.findById(sourceId)).thenReturn(Optional.of(source));
 
         when(metaConnRepo.findFirstByAccountIdAndTokenStatus(workspaceId, "VALID"))
-                .thenReturn(Optional.empty()); // fallback to local mock
+                .thenReturn(Optional.empty());
 
-        when(audienceRepo.save(any(MetaAudience.class))).thenAnswer(i -> i.getArgument(0));
-
-        List<MetaAudience> result = service.createSuperLookalike(workspaceId, name, sourceId, "IN");
-
-        assertNotNull(result);
-        assertEquals(3, result.size());
-        assertEquals(0.01, result.get(0).getLookalikeRatio());
-        assertEquals(0.02, result.get(1).getLookalikeRatio());
-        assertEquals(0.05, result.get(2).getLookalikeRatio());
-        verify(audienceRepo, times(3)).save(any(MetaAudience.class));
+        assertThrows(IllegalStateException.class,
+                () -> service.createSuperLookalike(workspaceId, name, sourceId, "IN"));
+        verify(audienceRepo, never()).save(any(MetaAudience.class));
     }
 
     @Test
@@ -97,8 +84,8 @@ public class MetaAudienceServiceTest {
 
         int count = service.syncHotLeadsToAudience(workspaceId, audienceId);
 
-        assertEquals(1, count);
-        assertEquals(101L, audience.getSizeEstimate());
-        verify(audienceRepo, times(1)).save(audience);
+        assertEquals(0, count);
+        assertEquals(100L, audience.getSizeEstimate());
+        verify(audienceRepo, never()).save(audience);
     }
 }

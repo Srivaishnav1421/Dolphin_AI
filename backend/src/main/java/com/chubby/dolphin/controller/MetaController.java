@@ -1,7 +1,10 @@
 package com.chubby.dolphin.controller;
 
 import com.chubby.dolphin.entity.MetaConnection;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
+import com.chubby.dolphin.service.LocalApprovalSafetyService;
 import com.chubby.dolphin.service.MetaAdsService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -22,10 +25,17 @@ public class MetaController {
 
     private final MetaAdsService metaAdsService;
     private final SecurityUtils sec;
+    private final AccessControlService access;
+    private final LocalApprovalSafetyService localApprovalSafetyService;
 
-    public MetaController(MetaAdsService metaAdsService, SecurityUtils sec) {
+    public MetaController(MetaAdsService metaAdsService,
+                          SecurityUtils sec,
+                          AccessControlService access,
+                          LocalApprovalSafetyService localApprovalSafetyService) {
         this.metaAdsService = metaAdsService;
         this.sec = sec;
+        this.access = access;
+        this.localApprovalSafetyService = localApprovalSafetyService;
     }
 
     /**
@@ -34,7 +44,8 @@ public class MetaController {
     @GetMapping("/auth-url")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ResponseEntity<?> getAuthUrl() {
-        String accountId = sec.currentAccountId();
+        access.requireWorkspacePermission(Permission.INTEGRATION_MANAGE);
+        String accountId = sec.currentWorkspaceId();
         String state = accountId + "|" + System.currentTimeMillis();
         String url = metaAdsService.getAuthorizationUrl(state);
         return ResponseEntity.ok(Map.of("auth_url", url, "state", state));
@@ -46,6 +57,7 @@ public class MetaController {
      */
     @PostMapping("/callback")
     public ResponseEntity<?> handleCallback(@RequestBody Map<String, String> body) {
+        access.requireWorkspacePermission(Permission.INTEGRATION_MANAGE);
         String code = body.get("code");
         String state = body.get("state");
 
@@ -54,7 +66,7 @@ public class MetaController {
         }
 
         // Extract accountId from state
-        String accountId = sec.currentAccountId();
+        String accountId = sec.currentWorkspaceId();
 
         try {
             MetaConnection conn = metaAdsService.exchangeCodeForToken(code, accountId);
@@ -80,7 +92,8 @@ public class MetaController {
      */
     @GetMapping("/connections")
     public ResponseEntity<List<MetaConnection>> listConnections() {
-        return ResponseEntity.ok(metaAdsService.getConnectionsForAccount(sec.currentAccountId()));
+        access.requireWorkspacePermission(Permission.INTEGRATION_READ);
+        return ResponseEntity.ok(metaAdsService.getConnectionsForAccount(sec.currentWorkspaceId()));
     }
 
     /**
@@ -88,7 +101,8 @@ public class MetaController {
      */
     @GetMapping("/status")
     public ResponseEntity<?> connectionStatus() {
-        String accountId = sec.currentAccountId();
+        access.requireWorkspacePermission(Permission.INTEGRATION_READ);
+        String accountId = sec.currentWorkspaceId();
         return metaAdsService.getActiveConnection(accountId)
                 .map(conn -> ResponseEntity.ok(Map.of(
                     "connected", true,
@@ -110,7 +124,8 @@ public class MetaController {
      */
     @PostMapping("/sync")
     public ResponseEntity<?> syncCampaigns() {
-        String accountId = sec.currentAccountId();
+        access.requireWorkspacePermission(Permission.INTEGRATION_MANAGE);
+        String accountId = sec.currentWorkspaceId();
         return metaAdsService.getActiveConnection(accountId)
                 .map(conn -> {
                     var campaigns = metaAdsService.syncCampaigns(conn);
@@ -130,7 +145,8 @@ public class MetaController {
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ResponseEntity<?> updateSettings(@PathVariable String id, @RequestBody Map<String, Object> body) {
         try {
-            MetaConnection conn = metaAdsService.updateConnectionSettings(sec.currentAccountId(), id, body);
+            access.requireWorkspacePermission(Permission.INTEGRATION_MANAGE);
+            MetaConnection conn = metaAdsService.updateConnectionSettings(sec.currentWorkspaceId(), id, body);
             return ResponseEntity.ok(Map.of("message", "Settings updated", "connection", conn));
         } catch (IllegalArgumentException | SecurityException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -144,7 +160,8 @@ public class MetaController {
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ResponseEntity<?> disconnect(@PathVariable String id) {
         try {
-            metaAdsService.disconnectConnection(sec.currentAccountId(), id);
+            access.requireWorkspacePermission(Permission.INTEGRATION_MANAGE);
+            metaAdsService.disconnectConnection(sec.currentWorkspaceId(), id);
             return ResponseEntity.ok(Map.of("message", "Meta account disconnected"));
         } catch (IllegalArgumentException | SecurityException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -156,7 +173,8 @@ public class MetaController {
      */
     @PostMapping(value = "/upload-image", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadImage(@org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
-        String accountId = sec.currentAccountId();
+        access.requireWorkspacePermission(Permission.FILE_MANAGE);
+        String accountId = sec.currentWorkspaceId();
         return metaAdsService.getActiveConnection(accountId)
                 .map(conn -> {
                     try {
@@ -174,7 +192,23 @@ public class MetaController {
      */
     @PostMapping("/launch-ad")
     public ResponseEntity<?> launchAd(@RequestBody Map<String, Object> body) {
-        String accountId = sec.currentAccountId();
+        access.requireWorkspacePermission(Permission.CAMPAIGN_APPROVE_AI_ACTION);
+        String accountId = sec.currentWorkspaceId();
+        if (localApprovalSafetyService.shouldRequireApprovalOnly("META_LAUNCH_AD")) {
+            localApprovalSafetyService.auditBlockedExecution(
+                    accountId,
+                    "META_LAUNCH_AD",
+                    "MetaAd",
+                    null,
+                    "Blocked /api/meta/launch-ad before Meta Marketing API call."
+            );
+            return ResponseEntity.status(403).body(Map.of(
+                    "success", false,
+                    "approval_required", true,
+                    "external_execution_allowed", false,
+                    "message", localApprovalSafetyService.blockedMessage("Meta launch")
+            ));
+        }
         return metaAdsService.getActiveConnection(accountId)
                 .map(conn -> {
                     try {

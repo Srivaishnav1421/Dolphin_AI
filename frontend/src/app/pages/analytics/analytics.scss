@@ -1,35 +1,19 @@
-@import '../../../styles/design-tokens.scss';
+@use '../../../styles/design-tokens.scss' as *;
 
 .analytics-page {
-  padding: $spacing-32;
-  height: 100vh;
   display: flex;
   flex-direction: column;
   gap: $spacing-24;
-  overflow-y: auto;
-  max-width: $max-content-width;
-  margin: 0 auto;
 }
 
 .analytics-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-  padding-bottom: $spacing-16;
-}
-
-.analytics-title {
-  font-family: $font-family;
-  font-size: $font-title;
-  font-weight: 700;
-  color: $text-primary;
-  letter-spacing: -0.5px;
 }
 
 .analytics-subtitle {
   font-family: $font-family;
-  font-size: $font-caption;
   color: $text-secondary;
 }
 
@@ -44,88 +28,69 @@
   font-size: $font-caption;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: $spacing-24;
+.analytics-truth-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-8;
+  color: $text-secondary;
+  font-family: $font-family;
+  font-size: $font-caption;
 }
 
-.kpi-content {
+.analytics-truth-strip span {
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  padding: 6px 10px;
+  background: $bg-surface;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: $spacing-16;
+}
+
+.analytics-panel {
   display: flex;
   flex-direction: column;
-  gap: $spacing-4;
+  gap: $spacing-12;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: $spacing-16;
+  background: $bg-surface;
 }
 
-.metric-val {
+.analytics-panel h2 {
+  margin: 0;
   font-family: $font-family;
-  font-size: $font-title;
-  font-weight: 700;
+  font-size: $font-body;
+  font-weight: 800;
   color: $text-primary;
 }
 
-.emas-hint {
+.analytics-panel footer,
+.analytics-panel__eyebrow {
   font-family: $font-family;
   font-size: $font-meta;
   color: $text-muted;
 }
 
-.emas-bar-track {
-  height: 4px;
-  background: $bg-elevated;
-  border-radius: 2px;
-  margin-top: $spacing-8;
-  overflow: hidden;
-  width: 100%;
-}
-
-.emas-bar-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width $transition-normal ease;
-}
-
-.emas-summary {
+.metric-row {
   display: flex;
   align-items: center;
-  justify-content: space-around;
-  flex-wrap: wrap;
-  gap: $spacing-20;
-}
-
-.emas-summary__item {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-4;
-}
-
-.metric-label {
+  justify-content: space-between;
+  gap: $spacing-12;
   font-family: $font-family;
-  font-size: 11px;
-  font-weight: 700;
-  color: $text-muted;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: $font-caption;
 }
 
-.summary-val {
-  font-family: $font-family;
-  font-size: $font-title;
-  font-weight: 800;
+.metric-row span {
+  color: $text-secondary;
 }
 
-.text-accent {
-  color: $accent-primary;
-}
-
-.text-warn {
-  color: $color-warning;
-}
-
-.emas-summary__divider {
-  width: 1px;
-  height: 40px;
-  background: rgba(255, 255, 255, 0.05);
+.metric-row strong {
+  color: $text-primary;
+  text-align: right;
 }
 
 .skeleton-card {
@@ -139,6 +104,34 @@
   );
   background-size: 400% 100%;
   animation: shimmer 1.4s ease infinite;
+}
+
+.analytics-empty {
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  padding: 48px 24px;
+  text-align: center;
+  background: $bg-surface;
+}
+
+.analytics-empty h2 {
+  margin: 0 0 $spacing-8;
+  font-family: $font-family;
+  font-size: $font-body;
+  color: $text-primary;
+}
+
+.analytics-empty p {
+  margin: 0 auto;
+  max-width: 460px;
+  color: $text-secondary;
+  font-family: $font-family;
+  font-size: $font-caption;
+}
+
+.analytics-empty__error {
+  margin-top: $spacing-12 !important;
+  color: $color-danger !important;
 }
 
 @keyframes shimmer {

@@ -28,4 +28,6 @@ public interface AiUsageLogRepository extends JpaRepository<AiUsageLog, String> 
 
     @Query("SELECT COALESCE(SUM(l.totalTokens), 0L) FROM AiUsageLog l WHERE l.accountId = :workspaceId AND l.createdAt >= :since")
     long sumTokensByWorkspaceIdSince(@Param("workspaceId") String workspaceId, @Param("since") LocalDateTime since);
+
+    long countByAccountIdAndCreatedAtGreaterThanEqual(String accountId, LocalDateTime since);
 }

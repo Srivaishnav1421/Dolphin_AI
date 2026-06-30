@@ -27,18 +27,24 @@ public class CampaignSchedulerService {
     private final CampaignRepository   campaignRepo;
     private final BrainEventRepository brainEventRepo;
     private final AlertService         alertService;
+    private final LocalApprovalSafetyService localApprovalSafetyService;
 
     public CampaignSchedulerService(CampaignRepository campaignRepo,
                                     BrainEventRepository brainEventRepo,
-                                    AlertService alertService) {
+                                    AlertService alertService,
+                                    LocalApprovalSafetyService localApprovalSafetyService) {
         this.campaignRepo = campaignRepo;
         this.brainEventRepo = brainEventRepo;
         this.alertService = alertService;
+        this.localApprovalSafetyService = localApprovalSafetyService;
     }
 
     /** Friday 18:30 UTC = Saturday 00:00 IST — pause weekend campaigns */
     @Scheduled(cron = "0 30 18 * * FRI", zone = "UTC")
     public void pauseForWeekend() {
+        if (blockLocalScheduler("CAMPAIGN_SCHEDULER_PAUSE_WEEKEND")) {
+            return;
+        }
         List<Campaign> active = campaignRepo.findByStatus("ACTIVE");
         int count = 0;
         for (Campaign c : active) {
@@ -57,6 +63,9 @@ public class CampaignSchedulerService {
     /** Monday 03:30 UTC = Monday 09:00 IST — resume + scale up */
     @Scheduled(cron = "0 30 3 * * MON", zone = "UTC")
     public void resumeForMonday() {
+        if (blockLocalScheduler("CAMPAIGN_SCHEDULER_RESUME_MONDAY")) {
+            return;
+        }
         List<Campaign> paused = campaignRepo.findByStatus("PAUSED");
         int count = 0;
         for (Campaign c : paused) {
@@ -84,6 +93,9 @@ public class CampaignSchedulerService {
     /** Every hour — auto-complete campaigns past their scheduled end date */
     @Scheduled(cron = "0 0 * * * *")
     public void checkScheduledEndDates() {
+        if (blockLocalScheduler("CAMPAIGN_SCHEDULER_END_DATE")) {
+            return;
+        }
         List<Campaign> active = campaignRepo.findByStatus("ACTIVE");
         LocalDateTime now = LocalDateTime.now();
         for (Campaign c : active) {
@@ -107,5 +119,19 @@ public class CampaignSchedulerService {
         evt.setSeverity(severity);
         evt.setCreatedAt(LocalDateTime.now());
         brainEventRepo.save(evt);
+    }
+
+    private boolean blockLocalScheduler(String action) {
+        if (!localApprovalSafetyService.shouldRequireApprovalOnly(action)) {
+            return false;
+        }
+        localApprovalSafetyService.auditBlockedExecution(
+                null,
+                action,
+                "Campaign",
+                null,
+                "Scheduled campaign automation blocked before campaign mutation."
+        );
+        return true;
     }
 }

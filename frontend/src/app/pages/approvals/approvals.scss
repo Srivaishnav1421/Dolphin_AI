@@ -1,0 +1,230 @@
+.approvals-page {
+  .page-header .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.approval-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.approval-alert--success {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success), transparent 68%);
+}
+
+.approval-alert--error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger), transparent 68%);
+}
+
+.approval-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.approval-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+
+  span {
+    min-width: 22px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    font-size: 12px;
+  }
+}
+
+.approval-tab--active {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--primary), transparent 52%);
+  background: color-mix(in srgb, var(--primary), transparent 90%);
+}
+
+.approval-list {
+  display: grid;
+  gap: 14px;
+}
+
+.approval-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.approval-card--loading {
+  height: 168px;
+  background: linear-gradient(90deg, var(--bg-surface), rgba(255, 255, 255, 0.05), var(--bg-surface));
+  background-size: 200% 100%;
+  animation: approval-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes approval-pulse {
+  to { background-position: -200% 0; }
+}
+
+.approval-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+
+  h2 {
+    margin: 8px 0 6px;
+    font-size: 18px;
+    line-height: 1.25;
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+}
+
+.approval-card__meta,
+.approval-card__badges,
+.approval-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.approval-card__meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.approval-math-reason {
+  display: grid;
+  gap: 3px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+
+  strong {
+    color: var(--text-primary);
+    font-size: 12px;
+  }
+
+  span {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+}
+
+.approval-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+
+  div {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 7px 8px;
+    background: color-mix(in srgb, var(--bg-surface), var(--bg-elevated) 45%);
+  }
+
+  span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 10.5px;
+  }
+
+  strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+}
+
+.approval-details-toggle {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.approval-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  pre {
+    max-height: 260px;
+    overflow: auto;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+.approval-actions {
+  margin-top: 14px;
+  justify-content: flex-end;
+
+  .input {
+    min-width: min(320px, 100%);
+  }
+}
+
+.approval-empty {
+  padding: 42px;
+}
+
+@media (max-width: 720px) {
+  .approval-card__top {
+    flex-direction: column;
+  }
+
+  .approval-actions {
+    justify-content: stretch;
+
+    .btn,
+    .input {
+      width: 100%;
+    }
+  }
+}

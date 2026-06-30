@@ -46,7 +46,7 @@ public class AdvantageExperimentServiceTest {
         campaign.setMetaCampaignId("meta-123");
         campaign.setRoas(1.5);
 
-        when(campaignRepo.findById(campaignId)).thenReturn(Optional.of(campaign));
+        when(campaignRepo.findByIdAndWorkspaceId(campaignId, workspaceId)).thenReturn(Optional.of(campaign));
         when(experimentRepo.findByCampaignIdAndStatus(campaignId, "ACTIVE")).thenReturn(Optional.empty());
         when(experimentRepo.save(any(AdvantageExperiment.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -87,6 +87,27 @@ public class AdvantageExperimentServiceTest {
     }
 
     @Test
+    public void testActivateExperiment_BlocksWithoutMetaConnection() {
+        AdvantageExperiment exp = new AdvantageExperiment();
+        exp.setId("exp-123");
+        exp.setWorkspaceId("ws-123");
+        exp.setCampaignId("camp-abc");
+        exp.setMetaCampaignId("meta-123");
+        exp.setStatus("SUGGESTED");
+
+        when(experimentRepo.findById("exp-123")).thenReturn(Optional.of(exp));
+        when(metaConnRepo.findFirstByAccountIdAndTokenStatus("ws-123", "VALID")).thenReturn(Optional.empty());
+        when(experimentRepo.save(any(AdvantageExperiment.class))).thenAnswer(i -> i.getArgument(0));
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> service.activateAdvantagePlus("exp-123"));
+
+        assertTrue(thrown.getMessage().contains("requires a valid Meta connection"));
+        assertEquals("ACTIVATION_BLOCKED", exp.getStatus());
+        verify(experimentRepo).save(exp);
+    }
+
+    @Test
     public void testCreateAbExperiment_Generates27Permutations() {
         String workspaceId = "ws-123";
         String campaignId = "camp-abc";
@@ -96,7 +117,7 @@ public class AdvantageExperimentServiceTest {
         campaign.setMetaCampaignId("meta-123");
         campaign.setRoas(2.0);
 
-        when(campaignRepo.findById(campaignId)).thenReturn(Optional.of(campaign));
+        when(campaignRepo.findByIdAndWorkspaceId(campaignId, workspaceId)).thenReturn(Optional.of(campaign));
         when(experimentRepo.save(any(AdvantageExperiment.class))).thenAnswer(i -> i.getArgument(0));
 
         List<String> headlines = Arrays.asList("H1", "H2", "H3");

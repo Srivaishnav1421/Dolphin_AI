@@ -182,6 +182,32 @@ public class WorkflowService {
         });
     }
 
+    public void respondToApproval(String approvalId, String workspaceId, String decision, String reason) {
+        approvalRepo.findByIdAndWorkspaceId(approvalId, workspaceId).ifPresent(approval -> {
+            approval.setStatus(decision);
+            approval.setDecisionReason(reason);
+            approval.setUpdatedAt(LocalDateTime.now());
+            approvalRepo.save(approval);
+
+            executionRepo.findByExecutionId(approval.getExecutionId())
+                    .filter(exec -> workspaceId.equals(exec.getWorkspaceId()))
+                    .ifPresent(exec -> {
+                        exec.setStatus("APPROVED".equals(decision) ? "RUNNING" : "FAILED");
+                        if ("REJECTED".equals(decision)) {
+                            exec.setErrorLogs("Rejected by human: " + reason);
+                            exec.setEndTime(LocalDateTime.now());
+                            exec.setExecutionDuration(Duration.between(exec.getStartTime(), exec.getEndTime()).toMillis());
+                        }
+                        executionRepo.save(exec);
+
+                        broadcastEvent(exec.getWorkspaceId(), exec.getExecutionId(), exec.getTraceId(),
+                                "APPROVED".equals(decision) ? "APPROVAL_APPROVED" : "APPROVAL_REJECTED",
+                                "Approval checkpoint: " + decision,
+                                Map.of("reason", reason));
+                    });
+        });
+    }
+
     private void processN8nCompletedResponse(String executionId, String response) {
         executionRepo.findByExecutionId(executionId).ifPresent(exec -> {
             try {

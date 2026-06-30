@@ -1,12 +1,12 @@
-<div class="settings-page">
-  <header class="settings-header">
-    <div class="settings-header__title-section">
-      <h1 class="settings-title">Workspace Settings</h1>
-      <p class="settings-subtitle">Configure multi-tenant channels, WhatsApp Cloud API integrations, and legal GST/billing details.</p>
+<div class="settings-page page">
+  <header class="settings-header page-header">
+    <div>
+      <h1 class="settings-title">Settings</h1>
+      <p class="settings-subtitle">Keep your business, team, automations, integrations, and security simple and growth-ready.</p>
     </div>
     <button class="btn btn-primary" (click)="saveConfig()" [disabled]="saving() || loading()">
-      <span *ngIf="saving()">⚙️ Saving…</span>
-      <span *ngIf="!saving()">💾 Save Changes</span>
+      <span *ngIf="saving()">Saving...</span>
+      <span *ngIf="!saving()">Save changes</span>
     </button>
   </header>
 
@@ -21,315 +21,361 @@
   </ng-container>
 
   <ng-container *ngIf="!loading()">
-    <!-- Standalone UI Tabs component -->
     <ui-tabs
-      [tabs]="tabItems"
+      [tabs]="visibleTabItems()"
       [activeTab]="activeTab()"
       (tabChange)="setTab($any($event))"
     ></ui-tabs>
 
     <div class="settings-tab-content">
-      <!-- Tab 1: General Settings -->
       <div *ngIf="activeTab() === 'general'" class="tab-pane">
-        <ui-panel title="General Profile">
-          <p class="panel-desc">Configure your workspace branding, identity, and office address details.</p>
-          
+        <ui-panel title="General">
+          <p class="panel-desc">Set the customer-facing business name and billing identity for your workspace.</p>
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label">Brand Name</label>
-              <input class="form-input" type="text" [(ngModel)]="config().brandName" placeholder="e.g. DolphinAI" />
+              <label class="form-label">Brand name</label>
+              <input class="form-input" type="text" [(ngModel)]="config().brandName" placeholder="DolphinAI" />
             </div>
-
             <div class="form-group">
-              <label class="form-label">Brand Logo URL</label>
-              <input class="form-input" type="text" [(ngModel)]="config().brandLogoUrl" placeholder="e.g. https://logo.png" />
+              <label class="form-label">Brand logo URL</label>
+              <input class="form-input" type="text" [(ngModel)]="config().brandLogoUrl" placeholder="https://example.com/logo.png" />
             </div>
-
             <div class="form-group">
-              <label class="form-label">Legal Business Name</label>
-              <input class="form-input" type="text" [(ngModel)]="config().legalName" placeholder="e.g. DolphinAI Growth Private Limited" />
+              <label class="form-label">Legal business name</label>
+              <input class="form-input" type="text" [(ngModel)]="config().legalName" placeholder="DolphinAI Growth Private Limited" />
             </div>
-
             <div class="form-group">
-              <label class="form-label">Registered Office Address</label>
-              <textarea class="form-input form-textarea" [(ngModel)]="config().billingAddress" placeholder="Enter complete office address..."></textarea>
+              <label class="form-label">Registered office address</label>
+              <textarea class="form-input form-textarea" [(ngModel)]="config().billingAddress" placeholder="Enter complete office address"></textarea>
             </div>
           </div>
         </ui-panel>
       </div>
 
-      <!-- Tab 2: Workspace Details -->
       <div *ngIf="activeTab() === 'workspace'" class="tab-pane">
-        <ui-panel title="GST & Compliance Credentials">
-          <p class="panel-desc">Manage tax compliance and corporate billing details used for dynamically splitting CGST/SGST/IGST.</p>
-
+        <ui-panel title="Workspace">
+          <p class="panel-desc">Keep your India billing and business details ready for invoices and account records.</p>
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label">GSTIN (GST Identification Number)</label>
-              <input class="form-input" type="text" [(ngModel)]="config().gstin" placeholder="e.g. 27AAAAA1111A1Z1" style="text-transform: uppercase;" />
+              <label class="form-label">GSTIN</label>
+              <input class="form-input" type="text" [(ngModel)]="config().gstin" placeholder="27AAAAA1111A1Z1" style="text-transform: uppercase;" />
             </div>
-
             <div class="form-group">
-              <label class="form-label">PAN Number</label>
-              <input class="form-input" type="text" [(ngModel)]="config().panNumber" placeholder="e.g. ABCDE1234F" style="text-transform: uppercase;" />
+              <label class="form-label">PAN number</label>
+              <input class="form-input" type="text" [(ngModel)]="config().panNumber" placeholder="ABCDE1234F" style="text-transform: uppercase;" />
             </div>
-
             <div class="form-group">
-              <label class="form-label">State Code (Place of Supply)</label>
+              <label class="form-label">State</label>
               <select class="form-select" [(ngModel)]="config().stateCode">
                 <option *ngFor="let st of indianStates" [value]="st.code">{{ st.code }} - {{ st.name }}</option>
               </select>
             </div>
-
             <div class="form-group form-group--full">
-              <label class="form-label">Company Bank Account Details</label>
-              <textarea class="form-input form-textarea form-textarea--small" [(ngModel)]="config().bankDetails" placeholder="ICICI Bank | A/C: 1234567890 | IFSC: ICIC0000123"></textarea>
+              <label class="form-label">Business bank details</label>
+              <textarea class="form-input form-textarea form-textarea--small" [(ngModel)]="config().bankDetails" placeholder="Bank name, account number, IFSC"></textarea>
             </div>
           </div>
         </ui-panel>
       </div>
 
-      <!-- Tab 3: Integrations -->
-      <div *ngIf="activeTab() === 'integrations'" class="tab-pane">
-        <ui-panel title="Meta WhatsApp Cloud API Integration">
-          <p class="panel-desc">Link your Meta Developer Portal WhatsApp Business account to automate conversational lead nurturing.</p>
-          
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">WhatsApp Phone Number ID</label>
-              <input class="form-input" type="text" [(ngModel)]="config().whatsappPhoneId" placeholder="e.g. 104533221998" />
-              <span class="hint">The unique number ID provided by your Meta App WhatsApp setup screen.</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">WhatsApp Webhook Verify Token</label>
-              <div class="token-copy-box">
-                <input class="form-input token-input" type="text" [(ngModel)]="config().whatsappVerifyToken" readonly />
-                <button class="btn btn-ghost btn-sm" (click)="copyVerifyToken(config().whatsappVerifyToken)">📋 Copy</button>
-              </div>
-              <span class="hint">Configure this EXACT verify token in the Meta Developer Portal Webhook configurations.</span>
-            </div>
-
-            <div class="form-group form-group--full">
-              <label class="form-label">Permanent Access Token</label>
-              <input class="form-input" type="password" [(ngModel)]="config().whatsappToken" placeholder="EAAGx..." />
-              <span class="hint">Meta system user long-lived or permanent token. Secured via AES-256 field encryption.</span>
-            </div>
-          </div>
-
-          <div class="meta-instructions">
-            <h4>💡 Meta Developer Setup Quick Guide:</h4>
-            <ol>
-              <li>Go to <strong>developers.facebook.com</strong> → Open your Business app.</li>
-              <li>Add the <strong>WhatsApp</strong> product to your app.</li>
-              <li>Configure your Webhook URL to: <code>https://&lt;your-domain&gt;/webhooks/whatsapp</code></li>
-              <li>Set the Webhook Verification Token to the value copied above.</li>
-              <li>Subscribe to the Webhook event field: <code>messages</code>.</li>
-            </ol>
-          </div>
-        </ui-panel>
-      </div>
-
-      <!-- Tab 4: Automation & Insights -->
-      <div *ngIf="activeTab() === 'automation-insights'" class="tab-pane">
-        <ui-panel title="Growth Automation & Insight Telemetry">
-          <p class="panel-desc">Review your system's operational efficiency, processed leads count, and campaign automated operations in real-time.</p>
-
-          <div class="ai-telemetry-grid">
-            <div class="telemetry-card">
-              <span class="telemetry-title">Leads Processed</span>
-              <span class="telemetry-value text-primary">{{ automationMetrics().leadsProcessed | number }}</span>
-              <span class="telemetry-hint">Total qualified and enriched contacts</span>
-            </div>
-
-            <div class="telemetry-card">
-              <span class="telemetry-title">Campaign Automations</span>
-              <span class="telemetry-value text-accent">{{ automationMetrics().campaignAutomations | number }}</span>
-              <span class="telemetry-hint">Active optimization loops executed</span>
-            </div>
-
-            <div class="telemetry-card">
-              <span class="telemetry-title">Conversations Generated</span>
-              <span class="telemetry-value text-success">{{ automationMetrics().conversationsGenerated | number }}</span>
-              <span class="telemetry-hint">Conversational outreach threads started</span>
-            </div>
-
-            <div class="telemetry-card">
-              <span class="telemetry-title">Insights Created</span>
-              <span class="telemetry-value text-primary">{{ automationMetrics().insightsCreated | number }}</span>
-              <span class="telemetry-hint">Marketing anomalies & growth ideas compiled</span>
-            </div>
-
-            <div class="telemetry-card">
-              <span class="telemetry-title">Tasks Completed</span>
-              <span class="telemetry-value text-accent">{{ automationMetrics().tasksCompleted | number }}</span>
-              <span class="telemetry-hint">Repetitive tasks offloaded to growth agents</span>
-            </div>
-          </div>
-        </ui-panel>
-      </div>
-
-      <!-- Tab 5: Users & Roles -->
       <div *ngIf="activeTab() === 'users'" class="tab-pane">
-        <ui-panel title="Workspace Users & Roles Mapping">
-          <p class="panel-desc">Manage workspace access, permissions, and delegate autonomous campaigns authorization policies.</p>
+        <ui-panel title="Team">
+          <p class="panel-desc">Review real workspace members and control who can read, write, approve, and administer business data.</p>
 
-          <div class="users-list-grid" style="display:flex; flex-direction:column; gap:12px;">
-            <div *ngFor="let u of users()" class="user-item-row" style="display:flex; align-items:center; justify-content:space-between; padding:12px 18px; background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px;">
-              <div style="display:flex; align-items:center; gap:12px;">
-                <span style="font-size:24px;">{{ u.avatar }}</span>
+          <div class="access-control-panel">
+            <div class="access-control-panel__header">
+              <div>
+                <span class="metric-label">Access control</span>
+                <h3>Role-based permissions</h3>
+              </div>
+              <span class="status-badge" [class.status-connected]="canManageAccess()" [class.status-needs-setup]="!canManageAccess()">
+                {{ canManageAccess() ? 'You can manage access' : 'Read-only for your role' }}
+              </span>
+            </div>
+
+            <div class="access-matrix">
+              <div class="access-matrix__row access-matrix__row--head">
+                <span>Role</span>
+                <span>Dashboard</span>
+                <span>Read</span>
+                <span>Write</span>
+                <span>Admin</span>
+              </div>
+              <div *ngFor="let row of roleAccessRows" class="access-matrix__row">
+                <strong>{{ row.role }}</strong>
+                <span>{{ row.dashboard }}</span>
+                <span>{{ row.read }}</span>
+                <span>{{ row.write }}</span>
+                <span>{{ row.admin }}</span>
+              </div>
+            </div>
+          </div>
+
+          <ng-container *ngIf="teamLoading()">
+            <div class="loading-rows">
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          </ng-container>
+
+          <div class="team-list">
+            <div *ngFor="let u of users()" class="team-row">
+              <div class="team-row__person">
+                <div class="team-row__avatar">{{ u.name.charAt(0) }}</div>
                 <div>
-                  <div style="font-weight:600; font-size:14px; color:var(--text-bright);">{{ u.name }}</div>
-                  <div style="font-size:12px; color:var(--text-muted);">{{ u.email }}</div>
+                  <div class="team-row__name">{{ u.name }}</div>
+                  <div class="team-row__email">{{ u.email }}</div>
                 </div>
               </div>
-              
-              <div style="display:flex; align-items:center; gap:16px;">
-                <span class="badge active" style="font-size:10px;">{{ u.status }}</span>
-                <select class="form-select" [value]="u.role" (change)="updateUserRole(u.email, $any($event.target).value)" style="width:180px; padding:6px; background:rgba(0,0,0,0.2); color:#fff; border:1px solid var(--border); border-radius:4px;">
-                  <option value="OWNER">Owner (Full Admin)</option>
-                  <option value="ADMIN">Admin (Modify Configs)</option>
-                  <option value="MARKETING_MANAGER">Marketing Manager</option>
-                  <option value="SALES_MANAGER">Sales Manager</option>
-                  <option value="ANALYST">Analyst</option>
-                  <option value="VIEWER">Viewer (Read-only)</option>
+              <div class="team-row__actions">
+                <span class="status-badge status-connected">{{ u.status }}</span>
+                <select
+                  class="form-select"
+                  [ngModel]="u.role"
+                  [disabled]="!canEditRole(u) || teamSavingId() === u.id"
+                  (ngModelChange)="updateUserRole(u, $event)">
+                  <option *ngFor="let role of roleOptionsFor(u)" [ngValue]="role.value">{{ role.label }}</option>
                 </select>
               </div>
             </div>
+            <div *ngIf="!teamLoading() && users().length === 0" class="empty-state">
+              <div class="empty-state__title">No team members found</div>
+              <div class="empty-state__desc">Invite flow is not connected yet. Existing workspace users will appear here automatically.</div>
+            </div>
           </div>
         </ui-panel>
       </div>
 
-      <!-- Tab 6: Billing & Subscriptions -->
       <div *ngIf="activeTab() === 'billing'" class="tab-pane">
-        <ui-panel title="Workspace Subscriptions & Invoicing">
-          <p class="panel-desc">Manage your growth plan subscription details and review historic GST compliance invoices.</p>
-
-          <div class="billing-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
-            <!-- Subscription Quota Tracker -->
-            <div class="card" style="background:rgba(255,255,255,0.02); padding:20px; border-radius:8px; border:1px solid var(--border);">
-              <h3 style="font-size:15px; font-weight:600; margin-bottom:12px; color:var(--text-bright);">Active Plan Limits Tracker</h3>
-              
-              <div class="quota-item" style="margin-bottom: 12px;">
-                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
-                  <span style="color:var(--text-secondary);">Leads Processed:</span>
-                  <span style="font-weight:600;">12,490 / 50,000</span>
-                </div>
-                <div class="telemetry-progress-bg" style="height: 6px;">
-                  <div class="telemetry-progress-fill" style="width: 25%;"></div>
-                </div>
-              </div>
-
-              <div class="quota-item" style="margin-bottom: 12px;">
-                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
-                  <span style="color:var(--text-secondary);">Campaign Automations:</span>
-                  <span style="font-weight:600;">4 / 20</span>
-                </div>
-                <div class="telemetry-progress-bg" style="height: 6px;">
-                  <div class="telemetry-progress-fill" style="width: 20%;"></div>
-                </div>
-              </div>
-
-              <div class="quota-item">
-                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
-                  <span style="color:var(--text-secondary);">Conversations Generated:</span>
-                  <span style="font-weight:600;">3,120 / 10,000</span>
-                </div>
-                <div class="telemetry-progress-bg" style="height: 6px;">
-                  <div class="telemetry-progress-fill" style="width: 31.2%;"></div>
-                </div>
+        <ui-panel title="Billing">
+          <ng-container *ngIf="localModeEnabled(); else billingEnabledTpl">
+            <div class="empty-state automation-empty">
+              <div class="empty-state__title">Billing is disabled in local mode.</div>
+              <div class="empty-state__desc">DolphinAI is running as a local AI Growth Engine. Razorpay checkout, payment gateway setup, GST invoice flows, and subscription upgrades are hidden for now.</div>
+            </div>
+          </ng-container>
+          <ng-template #billingEnabledTpl>
+          <p class="panel-desc">India-first subscription details, usage summary, payment status, and invoices in INR.</p>
+          <div class="billing-hero">
+            <div class="billing-hero__copy">
+              <span class="metric-label">Subscription checkout</span>
+              <h3>{{ selectedPlanDetails().name }}</h3>
+              <p class="muted-copy">Pay in INR with UPI, card, netbanking, or wallet through Razorpay. GST invoices stay inside DolphinAI.</p>
+              <div class="billing-hero__actions">
+                <button class="btn btn-primary" (click)="startSubscriptionPayment()" [disabled]="recharging() || !paymentConfig()?.configured">
+                  <span *ngIf="!recharging()">Pay with UPI / Razorpay</span>
+                  <span *ngIf="recharging()">Opening checkout...</span>
+                </button>
+                <span
+                  class="status-badge"
+                  [class.status-connected]="paymentConfig()?.configured"
+                  [class.status-needs-setup]="!paymentConfig()?.configured">
+                  {{ paymentConfig()?.configured ? 'Razorpay ready' : (billingUnavailable() ? 'Unavailable' : 'Gateway setup needed') }}
+                </span>
               </div>
             </div>
-
-            <!-- Active subscription status card -->
-            <div class="card" style="background:rgba(255,255,255,0.02); padding:20px; border-radius:8px; border:1px solid var(--border); display:flex; flex-direction:column; justify-content:space-between;">
-              <div>
-                <h3 style="font-size:15px; font-weight:600; margin-bottom:12px; color:var(--text-bright);">Active Subscription Tier</h3>
-                <div style="font-size:20px; font-weight:700; color:var(--success); margin-bottom:8px;">Enterprise Scale Plan</div>
-                <p style="font-size:12.5px; color:var(--text-muted); line-height:1.4; margin-bottom:15px;">
-                  Your workspace is on a custom Growth tier, giving access to campaigns, growth decision engines, and meta-automation tools.
-                </p>
-              </div>
-              <div>
-                <div style="display:flex; justify-content:space-between; font-size:12px; border-top:1px solid var(--border); padding-top:10px; margin-bottom: 12px;">
-                  <span style="color:var(--text-muted);">Renewal Date:</span>
-                  <span style="font-weight:600;">June 30, 2026</span>
-                </div>
-                <button class="btn btn-primary btn-sm" style="width: 100%;">⚡ Upgrade Subscription Plan</button>
-              </div>
+            <div class="billing-hero__price">
+              <span>Monthly</span>
+              <strong>₹{{ selectedPlanDetails().price | number:'1.0-0' }}</strong>
+              <small>plus GST where applicable</small>
             </div>
           </div>
 
-          <!-- Invoice List -->
-          <div class="invoice-section" style="margin-top:25px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-              <h3 style="font-size:15px; font-weight:600; color:var(--text-bright);">Generated compliance GST invoices</h3>
+          <div class="billing-plan-grid">
+            <button
+              *ngFor="let plan of billingPlans"
+              class="billing-plan-card"
+              [class.billing-plan-card--active]="selectedPlan() === plan.id"
+              (click)="selectedPlan.set(plan.id)"
+              type="button">
+              <span class="billing-plan-card__top">
+                <span>
+                  <strong>{{ plan.name }}</strong>
+                  <small>₹{{ plan.price | number:'1.0-0' }} / month</small>
+                </span>
+                <app-icon name="payments" [size]="20"></app-icon>
+              </span>
+              <span>{{ plan.leads }}</span>
+              <span>{{ plan.automations }}</span>
+              <span>{{ plan.ai }}</span>
+            </button>
+          </div>
+
+          <div class="grid-2 billing-lower-grid">
+            <div class="card billing-card">
+              <div>
+                <div class="metric-label">Wallet & payment status</div>
+                <h3>
+                  <ng-container *ngIf="wallet(); else walletUnavailable">
+                    ₹{{ wallet()?.balance | number:'1.0-0' }}
+                  </ng-container>
+                  <ng-template #walletUnavailable>Unavailable</ng-template>
+                </h3>
+                <span class="status-badge" [class.status-connected]="(wallet()?.balance ?? 0) > 0" [class.status-needs-setup]="(wallet()?.balance ?? 0) <= 0">
+                  {{ wallet() ? ((wallet()?.balance ?? 0) > 0 ? 'Funds available' : 'Needs payment') : 'Live data unavailable' }}
+                </span>
+              </div>
+              <div class="billing-facts">
+                <div><span>Payment gateway</span><strong>{{ paymentConfig()?.provider || 'Unavailable' }}</strong></div>
+                <div><span>UPI support</span><strong>{{ paymentConfig()?.configured && paymentConfig()?.upi_supported ? 'Enabled in checkout' : 'Unavailable' }}</strong></div>
+                <div><span>Currency</span><strong>{{ paymentConfig()?.currency || 'Unavailable' }}</strong></div>
+              </div>
             </div>
-            
-            <div class="table-container" style="background:rgba(0,0,0,0.15); border-radius:8px; border:1px solid var(--border); overflow:hidden;">
-              <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+
+            <div class="card billing-card">
+              <div>
+                <div class="metric-label">Usage Summary</div>
+                <h3>This month</h3>
+              </div>
+              <ng-container *ngIf="automationMetrics(); else usageUnavailable">
+                <div class="quota-item">
+                  <div class="quota-label"><span>Leads processed</span><strong>{{ metricValue('leadsProcessed') | number }}</strong></div>
+                  <div class="telemetry-progress-bg"><div class="telemetry-progress-fill" [style.width.%]="metricValue('leadsProcessed') ? 18 : 0"></div></div>
+                </div>
+                <div class="quota-item">
+                  <div class="quota-label"><span>Campaign automations</span><strong>{{ metricValue('automationsExecuted') | number }}</strong></div>
+                  <div class="telemetry-progress-bg"><div class="telemetry-progress-fill" [style.width.%]="metricValue('automationsExecuted') ? 18 : 0"></div></div>
+                </div>
+                <div class="quota-item">
+                  <div class="quota-label"><span>AI conversations</span><strong>{{ metricValue('aiConversations') | number }}</strong></div>
+                  <div class="telemetry-progress-bg"><div class="telemetry-progress-fill" [style.width.%]="metricValue('aiConversations') ? 18 : 0"></div></div>
+                </div>
+              </ng-container>
+              <ng-template #usageUnavailable>
+                <div class="empty-state">
+                  <div class="empty-state__title">Usage unavailable</div>
+                  <div class="empty-state__desc">Live usage data could not be loaded from the database.</div>
+                </div>
+              </ng-template>
+            </div>
+          </div>
+
+          <div class="invoice-section">
+            <h3 class="section-heading">Invoices</h3>
+            <div class="table-wrap">
+              <table>
                 <thead>
-                  <tr style="background:rgba(255,255,255,0.03); border-bottom:1px solid var(--border);">
-                    <th style="padding:12px 18px; color:var(--text-muted);">Invoice Date</th>
-                    <th style="padding:12px 18px; color:var(--text-muted);">Invoice ID</th>
-                    <th style="padding:12px 18px; color:var(--text-muted);">Amount</th>
-                    <th style="padding:12px 18px; color:var(--text-muted);">Action</th>
+                  <tr>
+                    <th>Invoice Date</th>
+                    <th>Invoice ID</th>
+                    <th>Amount</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let inv of invoices()" style="border-bottom:1px solid rgba(255,255,255,0.04);">
-                    <td style="padding:12px 18px;">{{ inv.createdAt | date:'mediumDate' }}</td>
-                    <td style="padding:12px 18px;"><code>{{ inv.id }}</code></td>
-                    <td style="padding:12px 18px; font-weight:600;">₹{{ inv.amount | number:'1.2-2' }}</td>
-                    <td style="padding:12px 18px;">
-                      <a [href]="'http://localhost:8000/api/invoices/' + inv.id + '/download'" target="_blank" class="text-link" style="color:var(--primary); text-decoration:none; font-weight:500;">📥 PDF</a>
-                    </td>
+                  <tr *ngFor="let inv of invoices()">
+                    <td>{{ inv.createdAt | date:'mediumDate' }}</td>
+                    <td><code>{{ inv.id }}</code></td>
+                    <td style="font-weight:600;">₹{{ inv.amount | number:'1.2-2' }}</td>
+                    <td><a [href]="invoiceDownloadUrl(inv.id)" target="_blank" class="text-link">Download PDF</a></td>
                   </tr>
                   <tr *ngIf="invoices().length === 0">
-                    <td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No invoices available yet. Upgrade plan to generate one.</td>
+                    <td colspan="4">
+                      <div class="empty-state">
+                        <div class="empty-state__title">No invoices yet</div>
+                        <div class="empty-state__desc">Invoices will appear here after your next billing cycle.</div>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
+          </ng-template>
         </ui-panel>
       </div>
 
-      <!-- Tab 7: Security -->
+      <div *ngIf="activeTab() === 'automation-insights'" class="tab-pane">
+        <ui-panel title="Automation & Insights">
+          <p class="panel-desc">Customer-facing outcomes from automations and AI-assisted work.</p>
+          <div *ngIf="automationMetrics(); else automationUnavailableTpl" class="ai-telemetry-grid">
+            <div class="telemetry-card">
+              <span class="telemetry-title">AI Conversations</span>
+              <span class="telemetry-value text-success">{{ metricValue('aiConversations') | number }}</span>
+              <span class="telemetry-hint">Customer conversations assisted</span>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-title">Leads Processed</span>
+              <span class="telemetry-value text-primary">{{ metricValue('leadsProcessed') | number }}</span>
+              <span class="telemetry-hint">Contacts qualified and organized</span>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-title">Automations Executed</span>
+              <span class="telemetry-value text-accent">{{ metricValue('automationsExecuted') | number }}</span>
+              <span class="telemetry-hint">Business tasks completed automatically</span>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-title">Insights Generated</span>
+              <span class="telemetry-value text-primary">{{ metricValue('insightsGenerated') | number }}</span>
+              <span class="telemetry-hint">Growth ideas and alerts prepared</span>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-title">Tasks Completed</span>
+              <span class="telemetry-value text-accent">{{ metricValue('tasksCompleted') | number }}</span>
+              <span class="telemetry-hint">Follow-ups and repeat work finished</span>
+            </div>
+          </div>
+          <ng-template #automationUnavailableTpl>
+            <div class="empty-state automation-empty">
+              <div class="empty-state__title">Automation data unavailable</div>
+              <div class="empty-state__desc">Live automation metrics could not be loaded from the database.</div>
+            </div>
+          </ng-template>
+          <div *ngIf="metricsAreEmpty()" class="empty-state automation-empty">
+            <div class="empty-state__title">No automation usage recorded yet</div>
+            <div class="empty-state__desc">This section now shows only real workspace activity. Connect integrations or run automations to populate it.</div>
+          </div>
+        </ui-panel>
+      </div>
+
+      <div *ngIf="activeTab() === 'integrations'" class="tab-pane settings-integrations-pane">
+        <app-integrations></app-integrations>
+      </div>
+
       <div *ngIf="activeTab() === 'security'" class="tab-pane">
-        <ui-panel title="Security & API Cryptographic Shields">
-          <p class="panel-desc">Verify data encryption keys, API access, and secure incoming webhook signature compliance configurations.</p>
-          
-          <div style="display:flex; flex-direction:column; gap:16px;">
-            <div style="display:flex; align-items:start; gap:15px; padding:18px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:8px;">
-              <span style="font-size:24px;">🛡️</span>
+        <ui-panel title="Security">
+          <p class="panel-desc">Review how DolphinAI protects workspace data and secure connections.</p>
+          <div class="security-grid">
+            <div class="security-card">
+              <span class="security-card__icon"><app-icon name="lock" [size]="20"></app-icon></span>
               <div>
-                <h4 style="font-size:14px; font-weight:700; color:#10b981; margin-bottom:4px;">AES-256 Meta Credential Encryption Active</h4>
-                <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.4;">
-                  All long-lived permanent access tokens, secret keys, and campaign configurations are encrypted using AES/CBC/PKCS5Padding before serialization in PostgreSQL, keyed to tenant-specific workspace salts.
-                </p>
+                <h4>Encrypted API keys</h4>
+                <p>Saved keys are protected and never shown in full after saving.</p>
               </div>
             </div>
+            <div class="security-card">
+              <span class="security-card__icon"><app-icon name="verified_user" [size]="20"></app-icon></span>
+              <div>
+                <h4>Secure connection checks</h4>
+                <p>Connected tools can be tested before your team depends on them.</p>
+              </div>
+            </div>
+            <div class="security-card">
+              <span class="security-card__icon"><app-icon name="group" [size]="20"></app-icon></span>
+              <div>
+                <h4>Team access</h4>
+                <p>Roles help keep billing, settings, and campaign access under control.</p>
+              </div>
+            </div>
+          </div>
+        </ui-panel>
+      </div>
 
-            <div style="display:flex; align-items:start; gap:15px; padding:18px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:8px;">
-              <span style="font-size:24px;">🔒</span>
-              <div>
-                <h4 style="font-size:14px; font-weight:700; color:#10b981; margin-bottom:4px;">Webhook HMAC Validation Guard (X-Hub-Signature-256)</h4>
-                <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.4;">
-                  Incoming WhatsApp events and SDR chat requests are verified using a custom HMAC-SHA256 handshake. Any request lacking a valid Meta application signature is rejected with a 401 unauthorized code to prevent spoofing.
-                </p>
-              </div>
-            </div>
-
-            <div style="display:flex; align-items:start; gap:15px; padding:18px; background:rgba(0,212,255,0.05); border:1px solid rgba(0,212,255,0.2); border-radius:8px;">
-              <span style="font-size:24px;">🔑</span>
-              <div>
-                <h4 style="font-size:14px; font-weight:700; color:var(--primary); margin-bottom:4px;">Tenant WebSocket Segregation</h4>
-                <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.4;">
-                  Live events and decisions dispatches are segregated via tenant-scoped STOMP channels (<code>/topic/workspace/&#123;workspaceId&#125;/...</code>) ensuring absolute cross-tenant isolation and preventing real-time data leaks.
-                </p>
-              </div>
-            </div>
+      <div *ngIf="activeTab() === 'system' && canSeeRuntimeIdentity()" class="tab-pane">
+        <ui-panel title="System">
+          <p class="panel-desc">Runtime identity for local development and system administration.</p>
+          <div class="runtime-grid">
+            <div><span>Profile</span><strong>{{ runtimeIdentity()?.profile }}</strong></div>
+            <div><span>Backend</span><strong>{{ runtimeConfig.apiBase }}</strong></div>
+            <div><span>Database</span><strong>{{ runtimeIdentity()?.database?.name || 'unknown' }}</strong></div>
+            <div><span>Host</span><strong>{{ runtimeIdentity()?.database?.host }}:{{ runtimeIdentity()?.database?.port }}</strong></div>
+            <div><span>Product</span><strong>{{ runtimeIdentity()?.database?.product || 'unknown' }}</strong></div>
+            <div><span>Status</span><strong>{{ runtimeIdentity()?.database?.connected ? 'connected' : 'down' }}</strong></div>
+            <div><span>Flyway</span><strong>{{ runtimeIdentity()?.database?.flyway || 'unknown' }}</strong></div>
+            <div><span>Local mode</span><strong>{{ runtimeIdentity()?.localModeEnabled ? 'enabled' : 'disabled' }}</strong></div>
+            <div><span>Fake data</span><strong>{{ runtimeIdentity()?.fakeDataEnabled ? 'enabled' : 'disabled' }}</strong></div>
+            <div><span>Mock AI</span><strong>{{ runtimeIdentity()?.mockAiEnabled ? 'enabled' : 'disabled' }}</strong></div>
+            <div><span>Environment</span><strong>{{ runtimeIdentity()?.environment || 'unknown' }}</strong></div>
           </div>
         </ui-panel>
       </div>

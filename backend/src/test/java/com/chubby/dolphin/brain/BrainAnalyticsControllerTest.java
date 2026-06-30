@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -19,6 +20,8 @@ public class BrainAnalyticsControllerTest {
     private BrainLearningEngine learningEngine;
     private BrainGovernanceService governanceService;
     private com.chubby.dolphin.security.SecurityUtils sec;
+    private com.chubby.dolphin.security.TenantAccessService tenantAccessService;
+    private com.chubby.dolphin.security.AccessControlService access;
     private BrainAnalyticsController controller;
 
     @BeforeEach
@@ -28,15 +31,17 @@ public class BrainAnalyticsControllerTest {
         learningEngine = mock(BrainLearningEngine.class);
         governanceService = mock(BrainGovernanceService.class);
         sec = mock(com.chubby.dolphin.security.SecurityUtils.class);
+        tenantAccessService = mock(com.chubby.dolphin.security.TenantAccessService.class);
+        access = mock(com.chubby.dolphin.security.AccessControlService.class);
         when(sec.currentWorkspaceId()).thenReturn("w1");
 
-        controller = new BrainAnalyticsController(decisionRepo, leadRepository, learningEngine, governanceService, sec);
+        controller = new BrainAnalyticsController(decisionRepo, leadRepository, learningEngine, governanceService, sec, tenantAccessService, access);
     }
 
     @Test
     public void testGetBrainAnalytics() {
         when(decisionRepo.findByAccountIdOrderByCreatedAtDesc(anyString())).thenReturn(new ArrayList<>());
-        when(leadRepository.count()).thenReturn(100L);
+        when(leadRepository.findByAccountId("w1")).thenReturn(Collections.nCopies(100, new com.chubby.dolphin.entity.Lead()));
         when(governanceService.evaluateGovernance(anyString(), any(), anyString(), anyDouble(), anyDouble()))
                 .thenReturn(92.0);
 

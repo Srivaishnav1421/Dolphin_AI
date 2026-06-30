@@ -3,11 +3,18 @@ package com.chubby.dolphin.security;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 @Component
 public class SecurityHeadersFilter implements Filter {
+
+    @Value("${app.security.content-security-policy}")
+    private String contentSecurityPolicy;
+
+    @Value("${app.security.hsts-enabled:false}")
+    private boolean hstsEnabled;
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -25,7 +32,11 @@ public class SecurityHeadersFilter implements Filter {
             }
             httpResponse.setHeader("X-Content-Type-Options", "nosniff");
             httpResponse.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-            httpResponse.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:* ws://localhost:*");
+            httpResponse.setHeader("Content-Security-Policy", contentSecurityPolicy);
+            httpResponse.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(self)");
+            if (hstsEnabled) {
+                httpResponse.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+            }
         }
         chain.doFilter(request, response);
     }

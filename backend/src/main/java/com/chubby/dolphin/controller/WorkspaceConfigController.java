@@ -6,9 +6,11 @@ import com.chubby.dolphin.security.SecurityUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -28,18 +30,16 @@ public class WorkspaceConfigController {
      * Get the workspace configuration for the active tenant.
      */
     @GetMapping
-    public ResponseEntity<WorkspaceConfig> getConfig() {
+    @Transactional(readOnly = true)
+    public ResponseEntity<Map<String, Object>> getConfig() {
         String workspaceId = sec.currentAccountId();
         WorkspaceConfig config = configRepo.findByWorkspaceId(workspaceId)
                 .orElseGet(() -> {
-                    // Create dynamic empty config if none exists yet
-                    WorkspaceConfig newConfig = new WorkspaceConfig();
-                    newConfig.setWorkspaceId(workspaceId);
-                    newConfig.setCreatedAt(LocalDateTime.now());
-                    newConfig.setUpdatedAt(LocalDateTime.now());
-                    return configRepo.save(newConfig);
+                    WorkspaceConfig emptyConfig = new WorkspaceConfig();
+                    emptyConfig.setWorkspaceId(workspaceId);
+                    return emptyConfig;
                 });
-        return ResponseEntity.ok(config);
+        return ResponseEntity.ok(toSafeResponse(config));
     }
 
     /**
@@ -47,15 +47,19 @@ public class WorkspaceConfigController {
      */
     @PutMapping
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
-    public ResponseEntity<WorkspaceConfig> updateConfig(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Map<String, Object>> updateConfig(@RequestBody Map<String, Object> body) {
         String workspaceId = sec.currentAccountId();
         WorkspaceConfig config = configRepo.findByWorkspaceId(workspaceId)
                 .orElse(new WorkspaceConfig());
 
         config.setWorkspaceId(workspaceId);
         config.setWhatsappPhoneId((String) body.get("whatsappPhoneId"));
-        config.setWhatsappToken((String) body.get("whatsappToken"));
-        config.setWhatsappVerifyToken((String) body.get("whatsappVerifyToken"));
+        if (hasNewSecret(body, "whatsappToken")) {
+            config.setWhatsappToken((String) body.get("whatsappToken"));
+        }
+        if (hasNewSecret(body, "whatsappVerifyToken")) {
+            config.setWhatsappVerifyToken((String) body.get("whatsappVerifyToken"));
+        }
         config.setBrandName((String) body.get("brandName"));
         config.setBrandLogoUrl((String) body.get("brandLogoUrl"));
         config.setBillingEmail((String) body.get("billingEmail"));
@@ -75,7 +79,49 @@ public class WorkspaceConfigController {
 
         WorkspaceConfig saved = configRepo.save(config);
         log.info("💼 Workspace configurations updated for tenant: {}", workspaceId);
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(toSafeResponse(saved));
+    }
+
+    private Map<String, Object> toSafeResponse(WorkspaceConfig config) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("id", config.getId());
+        response.put("workspaceId", config.getWorkspaceId());
+        response.put("whatsappPhoneId", config.getWhatsappPhoneId());
+        response.put("whatsappTokenConfigured", hasText(config.getWhatsappToken()));
+        response.put("whatsappVerifyTokenConfigured", hasText(config.getWhatsappVerifyToken()) || hasText(config.getWhatsappVerifyTokenHash()));
+        response.put("whatsappWebhookEnabled", Boolean.TRUE.equals(config.getWhatsappWebhookEnabled()));
+        response.put("minRoasThreshold", config.getMinRoasThreshold());
+        response.put("maxSpendLimit", config.getMaxSpendLimit());
+        response.put("targetCpl", config.getTargetCpl());
+        response.put("autoOptimizationEnabled", Boolean.TRUE.equals(config.getAutoOptimizationEnabled()));
+        response.put("brandName", config.getBrandName());
+        response.put("brandLogoUrl", config.getBrandLogoUrl());
+        response.put("billingEmail", config.getBillingEmail());
+        response.put("gstin", config.getGstin());
+        response.put("legalName", config.getLegalName());
+        response.put("billingAddress", config.getBillingAddress());
+        response.put("stateCode", config.getStateCode());
+        response.put("panNumber", config.getPanNumber());
+        response.put("bankDetails", config.getBankDetails());
+        response.put("createdAt", config.getCreatedAt());
+        response.put("updatedAt", config.getUpdatedAt());
+        return response;
+    }
+
+    private boolean hasNewSecret(Map<String, Object> body, String key) {
+        if (!body.containsKey(key)) {
+            return false;
+        }
+        Object raw = body.get(key);
+        if (!(raw instanceof String value)) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return !trimmed.isEmpty() && !trimmed.contains("••");
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private Double toDouble(Object obj) {

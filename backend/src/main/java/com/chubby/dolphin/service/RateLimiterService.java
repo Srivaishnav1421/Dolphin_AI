@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class RateLimiterService {
 
-    public enum LimitType { AI, PAYMENT, GENERAL, LOGIN, WEBHOOK }
+    public enum LimitType { AI, PAYMENT, GENERAL, LOGIN, WEBHOOK, EDGE }
 
     private final StringRedisTemplate redisTemplate;
     
@@ -55,6 +55,7 @@ public class RateLimiterService {
             case GENERAL -> 60;
             case LOGIN   -> 5;
             case WEBHOOK -> 100;
+            case EDGE    -> 600;
         };
         long windowSeconds = 60;
 
@@ -84,6 +85,7 @@ public class RateLimiterService {
             case GENERAL -> generalBuckets.computeIfAbsent(userId, k -> buildBucket(60, 60));
             case LOGIN   -> loginBuckets  .computeIfAbsent(userId, k -> buildBucket(5,  60));
             case WEBHOOK -> webhookBuckets.computeIfAbsent(userId, k -> buildBucket(100, 60));
+            case EDGE    -> generalBuckets.computeIfAbsent("edge:" + userId, k -> buildBucket(600, 60));
         };
     }
 

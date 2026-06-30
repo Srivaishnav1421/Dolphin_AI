@@ -1,7 +1,10 @@
 package com.chubby.dolphin.controller;
 
 import com.chubby.dolphin.entity.MetaConnection;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
+import com.chubby.dolphin.service.LocalApprovalSafetyService;
 import com.chubby.dolphin.service.MetaAdsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,18 +23,21 @@ public class MetaControllerTest {
 
     @Mock private MetaAdsService metaAdsService;
     @Mock private SecurityUtils sec;
+    @Mock private AccessControlService access;
+    @Mock private LocalApprovalSafetyService localApprovalSafetyService;
 
     private MetaController controller;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        controller = new MetaController(metaAdsService, sec);
+        when(localApprovalSafetyService.shouldRequireApprovalOnly(anyString())).thenReturn(false);
+        controller = new MetaController(metaAdsService, sec, access, localApprovalSafetyService);
     }
 
     @Test
     public void testGetAuthUrl() {
-        when(sec.currentAccountId()).thenReturn("account-123");
+        when(sec.currentWorkspaceId()).thenReturn("account-123");
         when(metaAdsService.getAuthorizationUrl(anyString())).thenReturn("https://facebook.com/oauth");
 
         ResponseEntity<?> response = controller.getAuthUrl();
@@ -46,7 +52,7 @@ public class MetaControllerTest {
 
     @Test
     public void testHandleCallbackSuccess() {
-        when(sec.currentAccountId()).thenReturn("account-123");
+        when(sec.currentWorkspaceId()).thenReturn("account-123");
         MetaConnection mockConn = new MetaConnection();
         mockConn.setId("conn-999");
         mockConn.setMetaAdAccountId("act_9999");
@@ -76,7 +82,7 @@ public class MetaControllerTest {
 
     @Test
     public void testListConnections() {
-        when(sec.currentAccountId()).thenReturn("account-123");
+        when(sec.currentWorkspaceId()).thenReturn("account-123");
         MetaConnection conn = new MetaConnection();
         when(metaAdsService.getConnectionsForAccount("account-123")).thenReturn(List.of(conn));
 
@@ -88,7 +94,7 @@ public class MetaControllerTest {
 
     @Test
     public void testConnectionStatusConnected() {
-        when(sec.currentAccountId()).thenReturn("account-123");
+        when(sec.currentWorkspaceId()).thenReturn("account-123");
         MetaConnection conn = new MetaConnection();
         conn.setMetaAdAccountId("act_888");
         conn.setAdAccountName("Demo Account");
@@ -109,7 +115,7 @@ public class MetaControllerTest {
 
     @Test
     public void testConnectionStatusNotConnected() {
-        when(sec.currentAccountId()).thenReturn("account-123");
+        when(sec.currentWorkspaceId()).thenReturn("account-123");
         when(metaAdsService.getActiveConnection("account-123")).thenReturn(Optional.empty());
 
         ResponseEntity<?> response = controller.connectionStatus();
@@ -119,5 +125,38 @@ public class MetaControllerTest {
         Map<?, ?> body = (Map<?, ?>) response.getBody();
         assertNotNull(body);
         assertEquals(false, body.get("connected"));
+    }
+
+    @Test
+    public void testLaunchAdBlockedInLocalApprovalFirstMode() {
+        when(sec.currentWorkspaceId()).thenReturn("account-123");
+        when(localApprovalSafetyService.shouldRequireApprovalOnly("META_LAUNCH_AD")).thenReturn(true);
+        when(localApprovalSafetyService.blockedMessage("Meta launch"))
+                .thenReturn("Meta launch is disabled in local approval-first mode. No external execution was performed.");
+
+        ResponseEntity<?> response = controller.launchAd(Map.of(
+                "headline", "Test headline",
+                "body_text", "Test body",
+                "image_hash", "hash-123",
+                "page_id", "page-123"
+        ));
+
+        assertEquals(403, response.getStatusCode().value());
+        Map<?, ?> body = (Map<?, ?>) response.getBody();
+        assertNotNull(body);
+        assertEquals(false, body.get("success"));
+        assertEquals(true, body.get("approval_required"));
+        assertEquals(false, body.get("external_execution_allowed"));
+        assertTrue(body.get("message").toString().contains("local approval-first mode"));
+        verify(access).requireWorkspacePermission(Permission.CAMPAIGN_APPROVE_AI_ACTION);
+        verify(localApprovalSafetyService).auditBlockedExecution(
+                eq("account-123"),
+                eq("META_LAUNCH_AD"),
+                eq("MetaAd"),
+                isNull(),
+                contains("/api/meta/launch-ad")
+        );
+        verify(metaAdsService, never()).getActiveConnection(anyString());
+        verify(metaAdsService, never()).launchAd(any(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyDouble());
     }
 }

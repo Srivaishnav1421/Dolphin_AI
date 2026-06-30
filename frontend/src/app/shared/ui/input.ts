@@ -21,7 +21,7 @@ import { NG_VALUE_ACCESSOR, ControlValueAccessor, FormsModule } from '@angular/f
     </div>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .ui-input-wrapper {
       display: flex;
@@ -123,7 +123,7 @@ export class UiInput implements ControlValueAccessor {
     </div>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .ui-search-box {
       display: flex;

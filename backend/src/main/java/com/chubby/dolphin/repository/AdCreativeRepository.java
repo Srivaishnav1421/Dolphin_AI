@@ -11,6 +11,8 @@ public interface AdCreativeRepository extends JpaRepository<AdCreative, String> 
     List<AdCreative> findByWorkspaceIdAndStatus(String workspaceId, String status);
     List<AdCreative> findByWorkspaceIdAndStatusIn(String workspaceId, java.util.Collection<String> statuses);
     java.util.Optional<AdCreative> findByIdAndWorkspaceId(String id, String workspaceId);
+    List<AdCreative> findByCampaignIdAndWorkspaceId(String campaignId, String workspaceId);
+    List<AdCreative> findByCampaignIdAndWorkspaceIdAndStatus(String campaignId, String workspaceId, String status);
 
     default List<AdCreative> findByAccountId(String accountId) {
         return findByWorkspaceId(accountId);

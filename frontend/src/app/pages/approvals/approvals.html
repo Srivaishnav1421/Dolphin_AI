@@ -1,0 +1,130 @@
+<div class="page approvals-page animate-fade-in">
+  <div class="page-header">
+    <div>
+      <h1>Approval Queue</h1>
+      <p>Review AI and automation actions before anything risky is executed.</p>
+    </div>
+    <button class="btn btn-ghost" (click)="load()" [disabled]="loading()">
+      <app-icon name="refresh" [size]="16"></app-icon>
+      Retry
+    </button>
+  </div>
+
+  @if (message()) {
+    <div class="approval-alert approval-alert--success">{{ message() }}</div>
+  }
+
+  @if (error()) {
+    <div class="approval-alert approval-alert--error">
+      <span>{{ error() }}</span>
+      <button class="btn btn-sm btn-ghost" (click)="load()">Retry</button>
+    </div>
+  }
+
+  <div class="approval-tabs">
+    <button class="approval-tab" [class.approval-tab--active]="activeTab() === 'PENDING'" (click)="setTab('PENDING')">
+      Pending <span>{{ pendingCount() }}</span>
+    </button>
+    <button class="approval-tab" [class.approval-tab--active]="activeTab() === 'APPROVED'" (click)="setTab('APPROVED')">
+      Approved <span>{{ approvedCount() }}</span>
+    </button>
+    <button class="approval-tab" [class.approval-tab--active]="activeTab() === 'REJECTED'" (click)="setTab('REJECTED')">
+      Rejected <span>{{ rejectedCount() }}</span>
+    </button>
+    <button class="approval-tab" [class.approval-tab--active]="activeTab() === 'ALL'" (click)="setTab('ALL')">
+      All <span>{{ approvals().length }}</span>
+    </button>
+  </div>
+
+  @if (loading()) {
+    <div class="approval-list">
+      <div class="approval-card approval-card--loading"></div>
+      <div class="approval-card approval-card--loading"></div>
+    </div>
+  } @else {
+    <div class="approval-list">
+      @for (item of visibleApprovals(); track item.id) {
+        <article class="approval-card">
+          <div class="approval-card__top">
+            <div>
+              <div class="approval-card__meta">
+                <span>{{ item.source_module }}</span>
+                <span>{{ item.action_type }}</span>
+                <span>{{ item.created_at | date:'medium' }}</span>
+              </div>
+              <h2>{{ item.title }}</h2>
+              <p>{{ item.description || 'No description recorded.' }}</p>
+              <div class="approval-math-reason">
+                <strong>Math reason</strong>
+                <span>{{ mathReason(item) }}</span>
+              </div>
+              @if (metricProof(item).length > 0) {
+                <div class="approval-metric-grid">
+                  @for (metric of metricProof(item); track metric.label) {
+                    <div>
+                      <span>{{ metric.label }}</span>
+                      <strong>{{ metric.value }}</strong>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            <div class="approval-card__badges">
+              <span class="status-badge" [ngClass]="severityClass(item.severity)">{{ item.severity }}</span>
+              <span class="status-badge" [ngClass]="statusClass(item.status)">{{ item.status }}</span>
+            </div>
+          </div>
+
+          <button class="approval-details-toggle" type="button" (click)="toggleDetails(item.id)">
+            {{ expandedId() === item.id ? 'Hide details' : 'Show details' }}
+          </button>
+
+          @if (expandedId() === item.id) {
+            <div class="approval-details">
+              <div>
+                <h3>Recommendation</h3>
+                <pre>{{ prettyJson(item.recommendation_json) }}</pre>
+              </div>
+              <div>
+                <h3>Math Snapshot</h3>
+                <pre>{{ prettyJson(item.math_snapshot_json) }}</pre>
+              </div>
+              @if (item.execution_result_json) {
+                <div>
+                  <h3>Execution Result</h3>
+                  <pre>{{ prettyJson(item.execution_result_json) }}</pre>
+                </div>
+              }
+            </div>
+          }
+
+          @if (item.status === 'PENDING' && canManageApprovals()) {
+            <div class="approval-actions">
+              <input class="input" placeholder="Optional rejection reason" [(ngModel)]="rejectReasons[item.id]" [disabled]="busyId() === item.id" />
+              <button class="btn btn-ghost btn-sm" (click)="reject(item)" [disabled]="busyId() === item.id">Reject</button>
+              <button class="btn btn-primary btn-sm" (click)="approve(item)" [disabled]="busyId() === item.id">Approve</button>
+            </div>
+          } @else if (item.status === 'APPROVED' && canExecuteApprovals()) {
+            <div class="approval-actions">
+              @if (item.execution_available) {
+                <button class="btn btn-primary btn-sm" (click)="execute(item)" [disabled]="busyId() === item.id">Execute</button>
+              } @else {
+                <span class="muted-copy">Approved. Execution integration not connected.</span>
+                <button class="btn btn-ghost btn-sm" (click)="execute(item)" [disabled]="busyId() === item.id">Check execution</button>
+              }
+            </div>
+          } @else if (!canManageApprovals() && item.status === 'PENDING') {
+            <p class="muted-copy">Your role can review this item but cannot approve or reject it.</p>
+          }
+        </article>
+      } @empty {
+        <div class="empty-state approval-empty">
+          <div class="empty-state__title">
+            {{ activeTab() === 'PENDING' ? 'No pending approvals.' : 'No approval items found.' }}
+          </div>
+          <div class="empty-state__desc">Run Ad Brain or create an approval-required action to populate this queue.</div>
+        </div>
+      }
+    </div>
+  }
+</div>

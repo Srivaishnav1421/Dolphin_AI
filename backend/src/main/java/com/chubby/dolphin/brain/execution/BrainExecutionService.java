@@ -155,34 +155,10 @@ public class BrainExecutionService {
             }
 
             decision.setExecutedAt(LocalDateTime.now());
-            decision.setStatus("EXECUTED");
+            decision.setStatus("EXECUTED_LOCAL_ONLY");
             decisionRepo.save(decision);
 
-            // Outcome Analysis
-            double simulatedAfterRoas = (decision.getRoasAtDecision() != null ? decision.getRoasAtDecision() : 1.2) * 1.15;
-            double simulatedAfterCtr = (decision.getCtrAtDecision() != null ? decision.getCtrAtDecision() : 2.5) * 1.10;
-            double simulatedAfterCpc = (decision.getLlmProvider() != null) ? 15.0 : 20.0;
-            double simulatedLeads = 12.0;
-
-            ExecutionScore score = outcomeAnalyzer.analyze(decision, simulatedAfterRoas, simulatedAfterCtr, simulatedAfterCpc, simulatedLeads);
-            decision.setOutcomePositive(score.getSuccessRate() > 0.0);
-            decision.setRoasAfterExecution(simulatedAfterRoas);
-            decisionRepo.save(decision);
-
-            // Learning update
-            learningEngine.updateStats(
-                    decision.getAccountId(), 
-                    decision.getDecisionType(), 
-                    score.getSuccessRate() > 0.0 ? 0.88 : 0.65, 
-                    score.getSuccessRate() > 0.0 ? 0.12 : 0.35, 
-                    score.getImpactScore(), 
-                    decision.getRiskScore()
-            );
-
-            // Memory consolidation
-            memoryService.saveMemorySummary(decision.getAccountId(), "execution_outcome", score);
-
-            broadcastWs(decision.getAccountId(), decisionId, "EXECUTION_COMPLETED", "✅ Execution completed successfully: " + decision.getDecisionType());
+            broadcastWs(decision.getAccountId(), decisionId, "EXECUTION_COMPLETED", "Execution recorded. Outcome learning will update after real campaign telemetry syncs.");
 
             actionAuditService.logAiAction(decision.getAccountId(), "CONTROLLED_AUTONOMOUS", decision.getDecisionType(),
                     "Campaign", decision.getCampaignId(), decision.getReason(),

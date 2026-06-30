@@ -20,11 +20,12 @@ export class Sidebar implements OnInit {
   constructor(public auth: AuthService, private api: ApiService) {}
 
   navItems: NavItem[] = [
-    { path: '/dashboard',  icon: '⬡',  label: 'Dashboard'  },
+    { path: '/dashboard',  icon: '⬡',  label: 'Growth Home' },
     { path: '/leads',      icon: '👥',  label: 'CRM'        },
     { path: '/campaigns',  icon: '📢',  label: 'Campaigns'  },
-    { path: '/creatives',  icon: '🎨',  label: 'AI Studio'  },
-    { path: '/ad-brain',   icon: '🧠',  label: 'AI Brain'   },
+    { path: '/creatives',  icon: '🎨',  label: 'Creative Studio' },
+    { path: '/ad-brain',   icon: '🧠',  label: 'AI Insights' },
+    { path: '/approvals',  icon: '✓',  label: 'Approval Queue' },
     { path: '/automation', icon: '⚡',  label: 'Automation' },
     { path: '/analytics',  icon: '📊',  label: 'Analytics'  },
     { path: '/settings',   icon: '⚙️',  label: 'Settings'   }

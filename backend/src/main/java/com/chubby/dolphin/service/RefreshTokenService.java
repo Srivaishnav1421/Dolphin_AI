@@ -69,8 +69,8 @@ public class RefreshTokenService {
 
     /** Revoke ALL tokens for a user (on logout or password change) */
     @Transactional
-    public void revokeAll(String userId) {
-        repo.revokeAllByUserId(userId);
+    public int revokeAll(String userId) {
+        return repo.revokeAllByUserId(userId);
     }
 
     /** Rotate — revoke old token, issue new one (one-time-use pattern) */

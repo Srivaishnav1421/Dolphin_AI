@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, String> {
     List<Invoice> findByWorkspaceId(String workspaceId);
+    Optional<Invoice> findByIdAndWorkspaceId(String id, String workspaceId);
     Optional<Invoice> findByInvoiceNumberAndWorkspaceId(String invoiceNumber, String workspaceId);
 }

@@ -2,6 +2,8 @@ package com.chubby.dolphin.controller;
 
 import com.chubby.dolphin.entity.Invoice;
 import com.chubby.dolphin.repository.InvoiceRepository;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.GstInvoiceService;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +12,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
@@ -25,13 +26,16 @@ public class InvoiceController {
     private final GstInvoiceService invoiceService;
     private final InvoiceRepository invoiceRepo;
     private final SecurityUtils sec;
+    private final AccessControlService access;
 
     public InvoiceController(GstInvoiceService invoiceService,
                              InvoiceRepository invoiceRepo,
-                             SecurityUtils sec) {
+                             SecurityUtils sec,
+                             AccessControlService access) {
         this.invoiceService = invoiceService;
         this.invoiceRepo = invoiceRepo;
         this.sec = sec;
+        this.access = access;
     }
 
     /**
@@ -39,6 +43,7 @@ public class InvoiceController {
      */
     @GetMapping
     public ResponseEntity<List<Invoice>> getInvoices() {
+        access.requireWorkspacePermission(Permission.INVOICE_READ);
         return ResponseEntity.ok(invoiceRepo.findByWorkspaceId(sec.currentWorkspaceId()));
     }
 
@@ -46,8 +51,8 @@ public class InvoiceController {
      * Explicit trigger to generate an active GST Invoice for testing and auditing.
      */
     @PostMapping("/generate")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ResponseEntity<Invoice> generateInvoice(@RequestBody Map<String, Object> body) {
+        access.requireWorkspacePermission(Permission.BILLING_MANAGE);
         Double amount = Double.valueOf(body.getOrDefault("amount", 999.0).toString());
         String transactionId = (String) body.get("transaction_id");
         
@@ -60,14 +65,10 @@ public class InvoiceController {
      */
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> downloadInvoicePdf(@PathVariable String id) {
-        Invoice invoice = invoiceRepo.findById(id).orElse(null);
+        access.requireWorkspacePermission(Permission.INVOICE_READ);
+        Invoice invoice = invoiceRepo.findByIdAndWorkspaceId(id, sec.currentWorkspaceId()).orElse(null);
         if (invoice == null || invoice.getPdfPath() == null) {
             return ResponseEntity.notFound().build();
-        }
-
-        // Verify isolation boundaries
-        if (!invoice.getWorkspaceId().equals(sec.currentWorkspaceId())) {
-            return ResponseEntity.status(403).build();
         }
 
         File file = new File(invoice.getPdfPath());

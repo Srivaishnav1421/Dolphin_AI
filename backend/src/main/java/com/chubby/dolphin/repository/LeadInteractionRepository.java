@@ -8,6 +8,7 @@ import java.util.List;
 
 @Repository
 public interface LeadInteractionRepository extends JpaRepository<LeadInteraction, String> {
-    List<LeadInteraction> findByLeadId(String leadId);
+    List<LeadInteraction> findByLeadIdOrderByCreatedAtAsc(String leadId);
+    List<LeadInteraction> findByLeadIdAndWorkspaceIdOrderByCreatedAtAsc(String leadId, String workspaceId);
     List<LeadInteraction> findByWorkspaceId(String workspaceId);
 }

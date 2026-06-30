@@ -28,7 +28,7 @@ import java.util.Optional;
 @Slf4j
 public class WhatsAppController {
 
-    @Value("${meta.app.secret:dolphin_secret}")
+    @Value("${meta.app.secret:}")
     private String appSecret;
 
     private final WhatsAppService whatsAppService;
@@ -179,9 +179,12 @@ public class WhatsAppController {
         }
         String clientSig = signatureHeader.substring(7);
         try {
-            String key = (appSecret == null || appSecret.isBlank()) ? "dolphin_secret" : appSecret;
+            if (appSecret == null || appSecret.isBlank()) {
+                log.error("Meta app secret is not configured. Rejecting WhatsApp webhook signature validation.");
+                return false;
+            }
             Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             mac.init(secretKey);
             byte[] rawHmac = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             

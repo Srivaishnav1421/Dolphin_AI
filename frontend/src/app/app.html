@@ -1,1 +1,22 @@
-<!-- Angular default HTML cleared — routing handles everything via app.ts -->
+@if (checkingDatabase()) {
+  <main class="app-health app-health--checking">
+    <section class="app-health__panel">
+      <div class="app-health__mark">DolphinAI</div>
+      <h1>Preparing your growth workspace</h1>
+      <p>Checking the database before loading live business data.</p>
+      <div class="app-health__loader"></div>
+    </section>
+  </main>
+} @else if (!databaseConnected()) {
+  <main class="app-health">
+    <section class="app-health__panel">
+      <div class="app-health__mark">Frontend shell only</div>
+      <h1>Database connection unavailable. Live business data cannot be loaded.</h1>
+      <p>The browser can load this static screen, but DolphinAI is not running the app, login, leads, campaigns, analytics, or AI workflows until the backend confirms a live PostgreSQL connection.</p>
+      <button class="btn btn-primary" (click)="checkDatabase()">Check again</button>
+      <span class="app-health__message">{{ databaseMessage() }}</span>
+    </section>
+  </main>
+} @else {
+  <router-outlet />
+}

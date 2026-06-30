@@ -1,13 +1,18 @@
 package com.chubby.dolphin.controller.ai;
 
 import com.chubby.dolphin.controller.admin.AdminAiInfrastructureController;
+import com.chubby.dolphin.audit.AuditLogService;
 import com.chubby.dolphin.entity.AiWorkspaceBudget;
 import com.chubby.dolphin.entity.LlmProvider;
+import com.chubby.dolphin.entity.Organization;
+import com.chubby.dolphin.entity.User;
 import com.chubby.dolphin.entity.WorkspaceAiConfig;
 import com.chubby.dolphin.repository.AiResponseCacheRepository;
 import com.chubby.dolphin.repository.AiUsageLogRepository;
 import com.chubby.dolphin.repository.AiWorkspaceBudgetRepository;
 import com.chubby.dolphin.repository.WorkspaceAiConfigRepository;
+import com.chubby.dolphin.repository.WorkspaceAiTaskRouteRepository;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.ai.AIService;
 import com.chubby.dolphin.service.ai.AiProviderRouterService;
@@ -29,10 +34,16 @@ public class AiProviderControllerTest {
     @Mock private AiWorkspaceBudgetRepository budgetRepo;
     @Mock private AiUsageLogRepository usageLogRepo;
     @Mock private AiResponseCacheRepository cacheRepo;
+    @Mock private WorkspaceAiTaskRouteRepository taskRouteRepo;
     @Mock private SecurityUtils sec;
+    @Mock private AccessControlService access;
+    @Mock private AuditLogService auditLogService;
 
+    @Mock private AIService openAiService;
     @Mock private AIService ollamaService;
     @Mock private AIService huggingFaceService;
+    @Mock private AIService geminiService;
+    @Mock private AIService anthropicService;
     @Mock private AIService mockService;
 
     private AdminAiInfrastructureController controller;
@@ -40,16 +51,44 @@ public class AiProviderControllerTest {
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        controller = new AdminAiInfrastructureController(llmRouter, workspaceAiConfigRepo, budgetRepo, usageLogRepo, cacheRepo, sec);
+        controller = new AdminAiInfrastructureController(llmRouter, workspaceAiConfigRepo, budgetRepo, usageLogRepo, cacheRepo, taskRouteRepo, sec, access, auditLogService);
 
         when(sec.currentAccountId()).thenReturn("ws-123");
+        User user = new User();
+        user.setId("user-1");
+        user.setEmail("owner@dolphin.test");
+        user.setRole("OWNER");
+        Organization org = new Organization();
+        org.setId("org-1");
+        org.setName("Org");
+        org.setPlan("AGENCY");
+        user.setOrganization(org);
+        when(access.currentUser()).thenReturn(user);
 
         // Set up router mocks
         Map<LlmProvider, AIService> providerMap = new EnumMap<>(LlmProvider.class);
+        providerMap.put(LlmProvider.OPENAI, openAiService);
+        providerMap.put(LlmProvider.GEMINI, geminiService);
+        providerMap.put(LlmProvider.ANTHROPIC, anthropicService);
         providerMap.put(LlmProvider.OLLAMA, ollamaService);
         providerMap.put(LlmProvider.HUGGINGFACE, huggingFaceService);
         providerMap.put(LlmProvider.MOCK, mockService);
         when(llmRouter.getProviderMap()).thenReturn(providerMap);
+
+        when(openAiService.getProvider()).thenReturn(LlmProvider.OPENAI);
+        when(openAiService.isEnabled()).thenReturn(true);
+        when(openAiService.isAvailable()).thenReturn(false);
+        when(openAiService.getModelName()).thenReturn("gpt-4.1-mini");
+
+        when(geminiService.getProvider()).thenReturn(LlmProvider.GEMINI);
+        when(geminiService.isEnabled()).thenReturn(true);
+        when(geminiService.isAvailable()).thenReturn(false);
+        when(geminiService.getModelName()).thenReturn("gemini-1.5-flash");
+
+        when(anthropicService.getProvider()).thenReturn(LlmProvider.ANTHROPIC);
+        when(anthropicService.isEnabled()).thenReturn(true);
+        when(anthropicService.isAvailable()).thenReturn(false);
+        when(anthropicService.getModelName()).thenReturn("claude-3-5-sonnet-latest");
 
         when(ollamaService.getProvider()).thenReturn(LlmProvider.OLLAMA);
         when(ollamaService.isEnabled()).thenReturn(true);
@@ -80,7 +119,7 @@ public class AiProviderControllerTest {
         assertEquals("OLLAMA", body.get("activeProvider"));
 
         List<Map<String, Object>> list = (List<Map<String, Object>>) body.get("providers");
-        assertEquals(3, list.size());
+        assertEquals(6, list.size());
 
         Map<String, Object> ollamaInfo = list.stream()
                 .filter(m -> "OLLAMA".equals(m.get("provider")))
@@ -94,6 +133,7 @@ public class AiProviderControllerTest {
     public void testSwitchProviderSuccess() {
         WorkspaceAiConfig config = WorkspaceAiConfig.builder().workspaceId("ws-123").build();
         when(workspaceAiConfigRepo.findByWorkspaceId("ws-123")).thenReturn(Optional.of(config));
+        when(llmRouter.isProviderUsableForWorkspace(huggingFaceService, "ws-123")).thenReturn(true);
 
         Map<String, String> body = Map.of("provider", "HUGGINGFACE");
         ResponseEntity<Map<String, Object>> response = controller.switchProvider(body);
@@ -121,8 +161,7 @@ public class AiProviderControllerTest {
     public void testGetUsageStats() {
         when(usageLogRepo.sumCostByWorkspaceIdSince(eq("ws-123"), any())).thenReturn(1.23);
         when(usageLogRepo.sumTokensByWorkspaceIdSince(eq("ws-123"), any())).thenReturn(50000L);
-        when(usageLogRepo.count()).thenReturn(100L);
-        when(cacheRepo.count()).thenReturn(25L);
+        when(usageLogRepo.countByAccountIdAndCreatedAtGreaterThanEqual(eq("ws-123"), any())).thenReturn(100L);
 
         AiWorkspaceBudget budget = AiWorkspaceBudget.builder().workspaceId("ws-123").monthlyUsdBudget(150.0).build();
         when(budgetRepo.findByWorkspaceId("ws-123")).thenReturn(Optional.of(budget));
@@ -136,7 +175,8 @@ public class AiProviderControllerTest {
         assertEquals(1.23, body.get("currentMonthlySpendUsd"));
         assertEquals(50000L, body.get("currentMonthlyTokens"));
         assertEquals(150.0, body.get("monthlyBudgetLimitUsd"));
-        assertEquals(20.0, body.get("cacheHitRatePercent")); // 25 / (25 + 100) = 25/125 = 0.20 = 20%
+        assertEquals(100L, body.get("workspaceRequests"));
+        assertNull(body.get("cacheHitRatePercent"));
     }
 
     @Test

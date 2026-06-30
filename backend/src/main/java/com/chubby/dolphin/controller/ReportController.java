@@ -1,5 +1,8 @@
 package com.chubby.dolphin.controller;
 
+import com.chubby.dolphin.audit.AuditLogService;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.ReportService;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +24,15 @@ public class ReportController {
 
     private final ReportService reportService;
     private final SecurityUtils securityUtils;
+    private final AccessControlService access;
+    private final AuditLogService auditLogService;
 
-    public ReportController(ReportService reportService, SecurityUtils securityUtils) {
+    public ReportController(ReportService reportService, SecurityUtils securityUtils,
+                            AccessControlService access, AuditLogService auditLogService) {
         this.reportService = reportService;
         this.securityUtils = securityUtils;
+        this.access = access;
+        this.auditLogService = auditLogService;
     }
 
     /**
@@ -36,7 +44,8 @@ public class ReportController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
 
-        String activeAccountId = securityUtils.currentAccountId();
+        access.requireWorkspacePermission(Permission.REPORT_EXPORT);
+        String activeAccountId = securityUtils.currentWorkspaceId();
         
         // Default range: Last 30 Days if not specified
         LocalDate startDate = start != null ? start : LocalDate.now().minusDays(30);
@@ -46,6 +55,9 @@ public class ReportController {
                 securityUtils.currentEmail(), activeAccountId, startDate, endDate);
 
         byte[] pdfBytes = reportService.generateCampaignReportPdf(activeAccountId, startDate, endDate);
+        auditLogService.record(access.currentUser(), access.currentUser().getOrganization(), activeAccountId,
+                "REPORT_EXPORTED", "CampaignReport", activeAccountId,
+                "format=pdf; start=" + startDate + "; end=" + endDate);
 
         String filename = String.format("chubby_dolphin_report_%s_to_%s.pdf", startDate, endDate);
 

@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface LeadChatMessageRepository extends JpaRepository<LeadChatMessage, String> {
-    List<LeadChatMessage> findByLeadIdOrderByCreatedAtAsc(String leadId);
+    List<LeadChatMessage> findByLeadIdAndWorkspaceIdOrderByCreatedAtAsc(String leadId, String workspaceId);
 }

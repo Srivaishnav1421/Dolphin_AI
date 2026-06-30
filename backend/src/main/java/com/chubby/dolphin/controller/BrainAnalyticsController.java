@@ -3,6 +3,8 @@ package com.chubby.dolphin.controller;
 import com.chubby.dolphin.brain.BrainGovernanceService;
 import com.chubby.dolphin.brain.BrainLearningEngine;
 import com.chubby.dolphin.entity.BrainDecision;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.repository.BrainDecisionRepository;
 import com.chubby.dolphin.repository.LeadRepository;
 import lombok.AllArgsConstructor;
@@ -18,7 +20,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/brain/analytics")
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Slf4j
 public class BrainAnalyticsController {
 
@@ -27,6 +28,8 @@ public class BrainAnalyticsController {
     private final BrainLearningEngine learningEngine;
     private final BrainGovernanceService governanceService;
     private final com.chubby.dolphin.security.SecurityUtils sec;
+    private final com.chubby.dolphin.security.TenantAccessService tenantAccessService;
+    private final AccessControlService access;
 
     @Autowired
     public BrainAnalyticsController(
@@ -34,24 +37,33 @@ public class BrainAnalyticsController {
             LeadRepository leadRepository,
             BrainLearningEngine learningEngine,
             BrainGovernanceService governanceService,
-            com.chubby.dolphin.security.SecurityUtils sec) {
+            com.chubby.dolphin.security.SecurityUtils sec,
+            com.chubby.dolphin.security.TenantAccessService tenantAccessService,
+            AccessControlService access) {
         this.decisionRepo = decisionRepo;
         this.leadRepository = leadRepository;
         this.learningEngine = learningEngine;
         this.governanceService = governanceService;
         this.sec = sec;
+        this.tenantAccessService = tenantAccessService;
+        this.access = access;
     }
 
     @GetMapping
     public ResponseEntity<BrainAnalyticsDto> getBrainAnalytics(
             @RequestParam(value = "workspaceId", required = false) String workspaceId) {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         
         String activeWorkspaceId = sec.currentWorkspaceId();
         org.springframework.security.core.Authentication auth = 
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         boolean isAdmin = auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
-        String targetWorkspaceId = (isAdmin && workspaceId != null && !workspaceId.isBlank()) ? workspaceId : activeWorkspaceId;
+        String targetWorkspaceId = activeWorkspaceId;
+        if (isAdmin && workspaceId != null && !workspaceId.isBlank()) {
+            tenantAccessService.requireWorkspaceAccess(auth.getName(), workspaceId);
+            targetWorkspaceId = workspaceId;
+        }
 
         log.info("📊 Fetching closing-loop Brain CMO Analytics for workspace: {}", targetWorkspaceId);
 
@@ -62,8 +74,7 @@ public class BrainAnalyticsController {
         long executed = decisions.stream().filter(d -> "EXECUTED".equals(d.getStatus()) || "EXECUTED_LOCAL_ONLY".equals(d.getStatus())).count();
 
         long successful = decisions.stream().filter(d -> d.getOutcomePositive() != null && d.getOutcomePositive()).count();
-        double successRate = generated > 0 ? ((double) successful / generated) * 100.0 : 82.5; // defaults
-        if (successRate == 0.0) successRate = 82.5;
+        double successRate = generated > 0 ? ((double) successful / generated) * 100.0 : 0.0;
         double failureRate = 100.0 - successRate;
 
         // Dynamic Revenue Lift
@@ -72,7 +83,6 @@ public class BrainAnalyticsController {
                 .mapToDouble(d -> (d.getRoasAfterExecution() - d.getRoasAtDecision()) * 5000.0)
                 .filter(val -> val > 0.0)
                 .sum();
-        if (revenueImpact == 0.0) revenueImpact = 148500.0; // Dynamic default baseline
 
         // Spend saved from Pauses / Scale-downs
         double spendSaved = decisions.stream()
@@ -80,19 +90,17 @@ public class BrainAnalyticsController {
                 .filter(d -> d.getBudgetBefore() != null && d.getBudgetAfter() != null)
                 .mapToDouble(d -> d.getBudgetBefore() - d.getBudgetAfter())
                 .sum();
-        if (spendSaved == 0.0) spendSaved = 42100.0;
 
-        long leadsGenerated = leadRepository.count();
-        if (leadsGenerated == 0) leadsGenerated = 340;
+        long leadsGenerated = leadRepository.findByAccountId(targetWorkspaceId).size();
 
-        double experimentWinRate = 78.4;
-        double learningConfidence = 88.6;
+        double experimentWinRate = generated > 0 ? successRate : 0.0;
+        double learningConfidence = generated > 0 ? Math.min(95.0, 50.0 + (executed * 5.0)) : 0.0;
         double govScore = governanceService.evaluateGovernance(targetWorkspaceId, null, "SCALE_UP", 1000.0, 1200.0);
 
         BrainAnalyticsDto dto = BrainAnalyticsDto.builder()
-                .recommendationsGenerated(generated > 0 ? generated : 42)
-                .recommendationsApproved(approved > 0 ? approved : 36)
-                .recommendationsExecuted(executed > 0 ? executed : 32)
+                .recommendationsGenerated(generated)
+                .recommendationsApproved(approved)
+                .recommendationsExecuted(executed)
                 .successRate(successRate)
                 .failureRate(failureRate)
                 .revenueImpact(revenueImpact)

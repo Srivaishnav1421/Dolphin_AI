@@ -5,7 +5,10 @@ import com.chubby.dolphin.dto.ai.LlmResponse;
 import com.chubby.dolphin.entity.AiResponseCache;
 import com.chubby.dolphin.entity.LlmProvider;
 import com.chubby.dolphin.entity.WorkspaceAiConfig;
+import com.chubby.dolphin.entity.WorkspaceAiTaskRoute;
+import com.chubby.dolphin.repository.IntegrationSettingRepository;
 import com.chubby.dolphin.repository.WorkspaceAiConfigRepository;
+import com.chubby.dolphin.repository.WorkspaceAiTaskRouteRepository;
 import com.chubby.dolphin.service.ai.cache.AiCacheService;
 import com.chubby.dolphin.service.ai.cache.PromptHashService;
 import com.chubby.dolphin.service.ai.audit.AiBudgetService;
@@ -26,6 +29,8 @@ public class AiProviderRouterService {
 
     private final List<AIService> aiServices;
     private final WorkspaceAiConfigRepository workspaceAiConfigRepo;
+    private final IntegrationSettingRepository integrationSettingRepository;
+    private final WorkspaceAiTaskRouteRepository workspaceAiTaskRouteRepository;
     private final PromptHashService promptHashService;
     private final AiCacheService aiCacheService;
     private final AiUsageAuditService aiUsageAuditService;
@@ -35,12 +40,16 @@ public class AiProviderRouterService {
 
     public AiProviderRouterService(List<AIService> aiServices, 
                             WorkspaceAiConfigRepository workspaceAiConfigRepo,
+                            IntegrationSettingRepository integrationSettingRepository,
+                            WorkspaceAiTaskRouteRepository workspaceAiTaskRouteRepository,
                             PromptHashService promptHashService,
                             AiCacheService aiCacheService,
                             AiUsageAuditService aiUsageAuditService,
                             AiBudgetService aiBudgetService) {
         this.aiServices = aiServices;
         this.workspaceAiConfigRepo = workspaceAiConfigRepo;
+        this.integrationSettingRepository = integrationSettingRepository;
+        this.workspaceAiTaskRouteRepository = workspaceAiTaskRouteRepository;
         this.promptHashService = promptHashService;
         this.aiCacheService = aiCacheService;
         this.aiUsageAuditService = aiUsageAuditService;
@@ -68,22 +77,37 @@ public class AiProviderRouterService {
      * Resolves the appropriate AI provider for a workspace.
      */
     public AIService resolveProvider(String workspaceId) {
+        return resolveProvider(workspaceId, null);
+    }
+
+    public AIService resolveProvider(String workspaceId, String taskKey) {
+        if (workspaceId != null && !workspaceId.isBlank() && taskKey != null && !taskKey.isBlank()) {
+            Optional<WorkspaceAiTaskRoute> routeOpt = workspaceAiTaskRouteRepository.findByWorkspaceIdAndTaskKey(workspaceId, normalizeTaskKey(taskKey));
+            if (routeOpt.isPresent()) {
+                AIService service = providerMap.get(routeOpt.get().getProvider());
+                if (isProviderUsableForWorkspace(service, workspaceId)) {
+                    return service;
+                }
+                log.warn("Configured AI provider {} for task {} is not usable in workspace {}. Falling back to workspace default.",
+                        routeOpt.get().getProvider(), taskKey, workspaceId);
+            }
+        }
+
         if (workspaceId != null && !workspaceId.isBlank()) {
             Optional<WorkspaceAiConfig> configOpt = workspaceAiConfigRepo.findByWorkspaceId(workspaceId);
             if (configOpt.isPresent()) {
                 WorkspaceAiConfig config = configOpt.get();
                 LlmProvider preferredProvider = config.getActiveProvider();
                 AIService service = providerMap.get(preferredProvider);
-                if (service != null && service.isEnabled() && service.isAvailable()) {
+                if (isProviderUsableForWorkspace(service, workspaceId)) {
                     return service;
                 }
             }
         }
 
-        LlmProvider[] fallbacks = {LlmProvider.OLLAMA, LlmProvider.HUGGINGFACE, LlmProvider.MOCK};
-        for (LlmProvider provider : fallbacks) {
+        for (LlmProvider provider : fallbackOrder()) {
             AIService service = providerMap.get(provider);
-            if (service != null && service.isEnabled() && service.isAvailable()) {
+            if (isProviderUsableForWorkspace(service, workspaceId)) {
                 return service;
             }
         }
@@ -96,7 +120,7 @@ public class AiProviderRouterService {
      */
     public LlmResponse ask(String workspaceId, LlmRequest request) {
         // 1. Resolve active provider
-        AIService provider = resolveProvider(workspaceId);
+        AIService provider = resolveProvider(workspaceId, request != null ? request.getTaskKey() : null);
 
         // 2. Enforce limits and budget blocks
         aiBudgetService.withinBudget(workspaceId);
@@ -123,12 +147,12 @@ public class AiProviderRouterService {
         }
 
         // 4. Cache Miss - execute provider
-        LlmResponse response = provider.ask(request);
+        LlmResponse response = executeWithFallback(workspaceId, request, provider, false);
         response.setCached(false);
 
         // 5. Save response cache
         if (cachingEnabled && promptHash != null && !promptHash.isEmpty()) {
-            aiCacheService.put(promptHash, response, provider.getProvider(), Duration.ofHours(24));
+            aiCacheService.put(promptHash, response, providerFromResponse(response, provider.getProvider()), Duration.ofHours(24));
         }
 
         // 6. Persist auditing telemetry
@@ -164,12 +188,12 @@ public class AiProviderRouterService {
             }
         }
 
-        AIService provider = resolveProvider(workspaceId);
-        LlmResponse response = provider.chat(request);
+        AIService provider = resolveProvider(workspaceId, request != null ? request.getTaskKey() : null);
+        LlmResponse response = executeWithFallback(workspaceId, request, provider, true);
         response.setCached(false);
 
         if (cachingEnabled && promptHash != null && !promptHash.isEmpty()) {
-            aiCacheService.put(promptHash, response, provider.getProvider(), Duration.ofHours(24));
+            aiCacheService.put(promptHash, response, providerFromResponse(response, provider.getProvider()), Duration.ofHours(24));
         }
 
         aiUsageAuditService.recordUsage(workspaceId, request, response);
@@ -183,6 +207,102 @@ public class AiProviderRouterService {
         }
         Optional<WorkspaceAiConfig> configOpt = workspaceAiConfigRepo.findByWorkspaceId(workspaceId);
         return configOpt.map(WorkspaceAiConfig::getEnableCaching).orElse(true);
+    }
+
+    private LlmResponse executeWithFallback(String workspaceId, LlmRequest request, AIService primaryProvider, boolean chatMode) {
+        try {
+            return chatMode ? primaryProvider.chat(request) : primaryProvider.ask(request);
+        } catch (Exception primaryError) {
+            if (!isFallbackRoutingEnabled(workspaceId)) {
+                throw primaryError;
+            }
+
+            log.warn("AI provider {} failed for task {} in workspace {}. Trying fallback chain: {}",
+                    primaryProvider.getProvider(),
+                    request != null ? request.getTaskKey() : "GENERAL",
+                    workspaceId,
+                    primaryError.getMessage());
+
+            RuntimeException lastError = primaryError instanceof RuntimeException
+                    ? (RuntimeException) primaryError
+                    : new RuntimeException(primaryError);
+
+            for (LlmProvider fallbackProvider : fallbackOrder()) {
+                AIService fallbackService = providerMap.get(fallbackProvider);
+                if (fallbackService == null || fallbackService.getProvider() == primaryProvider.getProvider()) {
+                    continue;
+                }
+                if (!isProviderUsableForWorkspace(fallbackService, workspaceId)) {
+                    continue;
+                }
+                try {
+                    LlmResponse response = chatMode ? fallbackService.chat(request) : fallbackService.ask(request);
+                    log.warn("AI fallback succeeded with provider {} for task {} in workspace {}",
+                            fallbackService.getProvider(),
+                            request != null ? request.getTaskKey() : "GENERAL",
+                            workspaceId);
+                    return response;
+                } catch (Exception fallbackError) {
+                    lastError = fallbackError instanceof RuntimeException
+                            ? (RuntimeException) fallbackError
+                            : new RuntimeException(fallbackError);
+                    log.warn("AI fallback provider {} failed: {}", fallbackService.getProvider(), fallbackError.getMessage());
+                }
+            }
+            throw lastError;
+        }
+    }
+
+    private boolean isFallbackRoutingEnabled(String workspaceId) {
+        if (workspaceId == null || workspaceId.isBlank()) {
+            return true;
+        }
+        return workspaceAiConfigRepo.findByWorkspaceId(workspaceId)
+                .map(WorkspaceAiConfig::getEnableFallbackRouting)
+                .orElse(true);
+    }
+
+    private LlmProvider[] fallbackOrder() {
+        return new LlmProvider[]{LlmProvider.OPENAI, LlmProvider.GEMINI, LlmProvider.ANTHROPIC, LlmProvider.OLLAMA, LlmProvider.HUGGINGFACE, LlmProvider.MOCK};
+    }
+
+    private LlmProvider providerFromResponse(LlmResponse response, LlmProvider defaultProvider) {
+        if (response == null || response.getProvider() == null || response.getProvider().isBlank()) {
+            return defaultProvider;
+        }
+        try {
+            return LlmProvider.valueOf(response.getProvider().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return defaultProvider;
+        }
+    }
+
+    public boolean isProviderUsableForWorkspace(AIService service, String workspaceId) {
+        if (service == null || !service.isEnabled()) {
+            return false;
+        }
+        if (usesWorkspaceIntegrationCredentials(service.getProvider())) {
+            return hasWorkspaceProviderCredentials(workspaceId, service.getProvider()) || service.isAvailable();
+        }
+        return service.isAvailable();
+    }
+
+    private boolean usesWorkspaceIntegrationCredentials(LlmProvider provider) {
+        return provider == LlmProvider.OPENAI
+                || provider == LlmProvider.GEMINI
+                || provider == LlmProvider.ANTHROPIC
+                || provider == LlmProvider.HUGGINGFACE;
+    }
+
+    private boolean hasWorkspaceProviderCredentials(String workspaceId, LlmProvider provider) {
+        if (workspaceId == null || workspaceId.isBlank() || provider == null) {
+            return false;
+        }
+        return integrationSettingRepository.existsByWorkspaceIdAndProviderId(workspaceId, provider.name().toLowerCase());
+    }
+
+    private String normalizeTaskKey(String taskKey) {
+        return taskKey == null ? "" : taskKey.trim().toUpperCase();
     }
 
     public Map<LlmProvider, AIService> getProviderMap() {

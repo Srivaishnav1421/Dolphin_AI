@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
     </div>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .ui-empty-state {
       display: flex;

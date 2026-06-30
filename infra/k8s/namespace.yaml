@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dolphinal
+  labels:
+    app.kubernetes.io/name: dolphinal
+    app.kubernetes.io/part-of: dolphin-ai

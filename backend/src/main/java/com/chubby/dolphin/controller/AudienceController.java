@@ -2,6 +2,8 @@ package com.chubby.dolphin.controller;
 
 import com.chubby.dolphin.entity.MetaAudience;
 import com.chubby.dolphin.repository.MetaAudienceRepository;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.MetaAudienceService;
 import lombok.extern.slf4j.Slf4j;
@@ -20,13 +22,16 @@ public class AudienceController {
     private final MetaAudienceService audienceService;
     private final MetaAudienceRepository audienceRepo;
     private final SecurityUtils sec;
+    private final AccessControlService access;
 
     public AudienceController(MetaAudienceService audienceService,
                               MetaAudienceRepository audienceRepo,
-                              SecurityUtils sec) {
+                              SecurityUtils sec,
+                              AccessControlService access) {
         this.audienceService = audienceService;
         this.audienceRepo = audienceRepo;
         this.sec = sec;
+        this.access = access;
     }
 
     /**
@@ -34,6 +39,7 @@ public class AudienceController {
      */
     @GetMapping
     public ResponseEntity<List<MetaAudience>> listAudiences() {
+        access.requireWorkspacePermission(Permission.CAMPAIGN_READ);
         return ResponseEntity.ok(audienceRepo.findByWorkspaceId(sec.currentWorkspaceId()));
     }
 
@@ -43,6 +49,7 @@ public class AudienceController {
     @PostMapping("/custom")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<MetaAudience> createCustom(@RequestBody Map<String, String> body) {
+        access.requireWorkspacePermission(Permission.CAMPAIGN_UPDATE);
         String name = body.get("name");
         String description = body.getOrDefault("description", "Created via Chubby Dolphin AI");
         if (name == null || name.isBlank()) {
@@ -58,6 +65,7 @@ public class AudienceController {
     @PostMapping("/lookalike")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<MetaAudience> createLookalike(@RequestBody Map<String, Object> body) {
+        access.requireWorkspacePermission(Permission.CAMPAIGN_UPDATE);
         String name = (String) body.get("name");
         String sourceAudienceId = (String) body.get("source_audience_id");
         Double ratio = body.get("ratio") != null ? Double.valueOf(body.get("ratio").toString()) : 0.01;
@@ -68,19 +76,20 @@ public class AudienceController {
         }
 
         // Verify source audience belongs to workspace
-        java.util.Optional<MetaAudience> srcOpt = audienceRepo.findById(sourceAudienceId);
+        String workspaceId = sec.currentWorkspaceId();
+        java.util.Optional<MetaAudience> srcOpt = audienceRepo.findByIdAndWorkspaceId(sourceAudienceId, workspaceId);
         if (srcOpt.isEmpty()) {
             // Check if it's the external Meta ID
-            srcOpt = audienceRepo.findByWorkspaceId(sec.currentWorkspaceId()).stream()
+            srcOpt = audienceRepo.findByWorkspaceId(workspaceId).stream()
                     .filter(a -> sourceAudienceId.equals(a.getMetaAudienceId()))
                     .findFirst();
         }
-        if (srcOpt.isEmpty() || !srcOpt.get().getWorkspaceId().equals(sec.currentWorkspaceId())) {
+        if (srcOpt.isEmpty()) {
             return ResponseEntity.status(403).build();
         }
 
         MetaAudience audience = audienceService.createLookalikeAudience(
-                sec.currentWorkspaceId(), name, sourceAudienceId, ratio, country
+                workspaceId, name, sourceAudienceId, ratio, country
         );
         return ResponseEntity.ok(audience);
     }
@@ -91,6 +100,7 @@ public class AudienceController {
     @PostMapping("/super-lookalike")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<List<MetaAudience>> createSuperLookalike(@RequestBody Map<String, String> body) {
+        access.requireWorkspacePermission(Permission.CAMPAIGN_UPDATE);
         String name = body.get("name");
         String sourceAudienceId = body.get("source_audience_id");
         String country = body.getOrDefault("country", "IN");
@@ -100,18 +110,19 @@ public class AudienceController {
         }
 
         // Verify source audience belongs to workspace
-        java.util.Optional<MetaAudience> srcOpt = audienceRepo.findById(sourceAudienceId);
+        String workspaceId = sec.currentWorkspaceId();
+        java.util.Optional<MetaAudience> srcOpt = audienceRepo.findByIdAndWorkspaceId(sourceAudienceId, workspaceId);
         if (srcOpt.isEmpty()) {
-            srcOpt = audienceRepo.findByWorkspaceId(sec.currentWorkspaceId()).stream()
+            srcOpt = audienceRepo.findByWorkspaceId(workspaceId).stream()
                     .filter(a -> sourceAudienceId.equals(a.getMetaAudienceId()))
                     .findFirst();
         }
-        if (srcOpt.isEmpty() || !srcOpt.get().getWorkspaceId().equals(sec.currentWorkspaceId())) {
+        if (srcOpt.isEmpty()) {
             return ResponseEntity.status(403).build();
         }
 
         List<MetaAudience> pack = audienceService.createSuperLookalike(
-                sec.currentWorkspaceId(), name, sourceAudienceId, country
+                workspaceId, name, sourceAudienceId, country
         );
         return ResponseEntity.ok(pack);
     }
@@ -124,12 +135,10 @@ public class AudienceController {
     public ResponseEntity<Map<String, Object>> uploadContacts(
             @PathVariable String id,
             @RequestBody List<Map<String, String>> contacts) {
+        access.requireWorkspacePermission(Permission.CAMPAIGN_UPDATE);
 
-        java.util.Optional<MetaAudience> audOpt = audienceRepo.findById(id);
+        java.util.Optional<MetaAudience> audOpt = audienceRepo.findByIdAndWorkspaceId(id, sec.currentWorkspaceId());
         if (audOpt.isEmpty()) return ResponseEntity.notFound().build();
-        if (!audOpt.get().getWorkspaceId().equals(sec.currentWorkspaceId())) {
-            return ResponseEntity.status(403).build();
-        }
 
         boolean success = audienceService.uploadUsersToAudience(id, contacts);
         if (success) {
@@ -145,11 +154,9 @@ public class AudienceController {
     @PostMapping("/{id}/sync-hot-leads")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<Map<String, Object>> syncHotLeads(@PathVariable String id) {
-        java.util.Optional<MetaAudience> audOpt = audienceRepo.findById(id);
+        access.requireWorkspacePermission(Permission.CAMPAIGN_UPDATE);
+        java.util.Optional<MetaAudience> audOpt = audienceRepo.findByIdAndWorkspaceId(id, sec.currentWorkspaceId());
         if (audOpt.isEmpty()) return ResponseEntity.notFound().build();
-        if (!audOpt.get().getWorkspaceId().equals(sec.currentWorkspaceId())) {
-            return ResponseEntity.status(403).build();
-        }
 
         int count = audienceService.syncHotLeadsToAudience(sec.currentWorkspaceId(), id);
         return ResponseEntity.ok(Map.of("success", true, "synced_count", count));

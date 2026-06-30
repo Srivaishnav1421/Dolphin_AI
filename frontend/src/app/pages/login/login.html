@@ -9,12 +9,24 @@
       <span class="login-logo__icon">🐬</span>
       <div>
         <h1 class="login-logo__name">DolphinAI</h1>
-        <p class="login-logo__sub">Meta Ads Intelligence Platform</p>
+        <p class="login-logo__sub">Grow Faster. Work Smarter.</p>
       </div>
     </div>
 
     <h2 class="login-title">Welcome back</h2>
-    <p class="login-subtitle">Sign in to your dashboard</p>
+    <p class="login-subtitle">Sign in to your AI Growth Operating System</p>
+
+    @if (checkingDatabase()) {
+      <div class="login-status login-status--checking animate-fade-in">
+        Checking backend and PostgreSQL...
+      </div>
+    } @else if (!databaseConnected()) {
+      <div class="login-status login-status--blocked animate-fade-in">
+        <strong>Application blocked</strong>
+        <span>{{ databaseMessage() }}</span>
+        <button class="btn btn-ghost" type="button" (click)="checkDatabase()">Check again</button>
+      </div>
+    }
 
     <!-- Error -->
     @if (error()) {
@@ -22,22 +34,38 @@
     }
 
     <!-- Form -->
-    <form (ngSubmit)="submit()">
+    <form (ngSubmit)="submit()" [class.form-disabled]="!databaseConnected()">
       <div class="form-group">
         <label>Email address</label>
-        <input class="input" type="email" placeholder="you@agency.com" [(ngModel)]="email" name="email" />
+        <input class="input" type="email" placeholder="you@agency.com" [(ngModel)]="email" name="email" [disabled]="!databaseConnected()" />
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input class="input" type="password" placeholder="••••••••" [(ngModel)]="password" name="password" />
+        <input class="input" type="password" placeholder="••••••••" [(ngModel)]="password" name="password" [disabled]="!databaseConnected()" />
       </div>
+      @if (twoFactorRequired()) {
+        <div class="form-group animate-fade-in">
+          <label>Authenticator code</label>
+          <input
+            class="input otp-input"
+            type="text"
+            inputmode="numeric"
+            maxlength="6"
+            autocomplete="one-time-code"
+            placeholder="123456"
+            [(ngModel)]="totpCode"
+            name="totpCode"
+            [disabled]="!databaseConnected()"
+          />
+        </div>
+      }
 
-      <button class="btn btn-primary login-btn" type="submit" [disabled]="loading()">
+      <button class="btn btn-primary login-btn" type="submit" [disabled]="loading() || !databaseConnected()">
         @if (loading()) { <span class="spinner"></span> Signing in… }
         @else { 🔐 Sign In }
       </button>
     </form>
 
-    <p class="login-footer">DolphinAI v1.0 — Brain Module</p>
+    <p class="login-footer">One platform to grow your business</p>
   </div>
 </div>

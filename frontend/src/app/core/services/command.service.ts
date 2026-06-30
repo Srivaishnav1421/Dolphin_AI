@@ -38,11 +38,11 @@ export class CommandService {
     };
 
     this.commands = [
-      { id: 'nav-db', name: 'Open Dashboard', category: 'Navigation', shortcut: 'G D', action: () => nav('/dashboard') },
+      { id: 'nav-db', name: 'Open Growth Home', category: 'Navigation', shortcut: 'G D', action: () => nav('/dashboard') },
       { id: 'nav-crm', name: 'Open CRM', category: 'Navigation', shortcut: 'G C', action: () => nav('/leads') },
       { id: 'nav-camp', name: 'Open Campaigns', category: 'Navigation', shortcut: 'G P', action: () => nav('/campaigns') },
-      { id: 'nav-studio', name: 'Open AI Studio', category: 'Navigation', shortcut: 'G I', action: () => nav('/creatives') },
-      { id: 'nav-brain', name: 'Open AI Brain', category: 'Navigation', shortcut: 'G B', action: () => nav('/ad-brain') },
+      { id: 'nav-studio', name: 'Open Creative Studio', category: 'Navigation', shortcut: 'G I', action: () => nav('/creatives') },
+      { id: 'nav-brain', name: 'Open AI Insights', category: 'Navigation', shortcut: 'G B', action: () => nav('/ad-brain') },
       { id: 'nav-wf', name: 'Open Automation', category: 'Navigation', shortcut: 'G W', action: () => nav('/automation') },
       { id: 'nav-set', name: 'Open Settings', category: 'Navigation', shortcut: 'G S', action: () => nav('/settings') },
       { id: 'nav-an', name: 'Open Analytics', category: 'Navigation', shortcut: 'G N', action: () => nav('/analytics') },

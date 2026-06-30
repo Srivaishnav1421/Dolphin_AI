@@ -5,10 +5,12 @@ import com.chubby.dolphin.repository.*;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 
 @Service
 @Slf4j
@@ -19,43 +21,126 @@ public class DataSeeder {
     private final PasswordEncoder  encoder;
     private final OrganizationRepository orgRepo;
     private final WorkspaceRepository    workspaceRepo;
-    private final CampaignRepository     campaignRepo;
-    private final MetricSnapshotRepository snapshotRepo;
     private final WorkflowTemplateRepository templateRepo;
+    private final SubscriptionPlanRepository subscriptionPlanRepo;
+    private final Environment environment;
 
     public DataSeeder(UserRepository userRepo,
                       WalletRepository walletRepo,
                       PasswordEncoder encoder,
                       OrganizationRepository orgRepo,
                       WorkspaceRepository workspaceRepo,
-                      CampaignRepository campaignRepo,
-                      MetricSnapshotRepository snapshotRepo,
-                      WorkflowTemplateRepository templateRepo) {
+                      WorkflowTemplateRepository templateRepo,
+                      SubscriptionPlanRepository subscriptionPlanRepo,
+                      Environment environment) {
         this.userRepo = userRepo;
         this.walletRepo = walletRepo;
         this.encoder = encoder;
         this.orgRepo = orgRepo;
         this.workspaceRepo = workspaceRepo;
-        this.campaignRepo = campaignRepo;
-        this.snapshotRepo = snapshotRepo;
         this.templateRepo = templateRepo;
+        this.subscriptionPlanRepo = subscriptionPlanRepo;
+        this.environment = environment;
     }
 
-    @Value("${demo.email}")    private String demoEmail;
-    @Value("${demo.password}") private String demoPassword;
+    @Value("${first-run.owner.email:}")    private String firstRunOwnerEmail;
+    @Value("${first-run.owner.password:}") private String firstRunOwnerPassword;
+    @Value("${first-run.owner.name:Owner}") private String firstRunOwnerName;
+    @Value("${first-run.organization.name:DolphinAI Organization}") private String firstRunOrganizationName;
+    @Value("${first-run.workspace.name:Default Workspace}") private String firstRunWorkspaceName;
+    @Value("${demo.email:}")    private String demoEmail;
+    @Value("${demo.password:}") private String demoPassword;
+    @Value("${app.seed.demo-users-enabled:true}") private boolean demoUsersEnabled;
 
     /**
-     * Seeds initial records on startup:
-     * 1. Parent Organization
-     * 2. Multiple Isolated Client Workspaces
-     * 3. Admin user linked to organization & default active workspace
-     * 4. Multi-tenant mock campaigns and daily metrics snapshots
+     * Seeds only real bootstrap essentials and shared reference data:
+     * 1. Optional FIRST_RUN_OWNER_* owner, organization, and neutral workspace
+     * 2. Empty wallet for the first-run workspace
+     * 3. Shared subscription/workflow reference rows
      */
     @PostConstruct
     public void seed() {
-        seedAdminUser();
+        authCleanup();
+        seedSubscriptionPlans();
+        seedFirstRunOwner();
+        seedDemoTeamUsers();
         seedTemplates();
-        log.info("🐬 DolphinAI — Seed completed | Login: {} / {}", demoEmail, demoPassword);
+        log.info("DolphinAI startup seed completed.");
+    }
+
+    /**
+     * One-time auth cleanup: remove directly-inserted test user and restore
+     * admin password to the known DEMO_PASSWORD from .env.
+     * Safe to remove this method after verification is complete.
+     */
+    private void authCleanup() {
+        if (isProdProfile() || !demoUsersEnabled
+                || demoEmail == null || demoEmail.isBlank()
+                || demoPassword == null || demoPassword.isBlank()) {
+            return;
+        }
+
+        // 1. Remove test@dolphin.ai if it exists (was inserted directly for testing)
+        userRepo.findByEmail("test@dolphin.ai").ifPresent(testUser -> {
+            userRepo.delete(testUser);
+            log.info("🧹 Auth cleanup: removed directly-inserted test user test@dolphin.ai");
+        });
+
+        // 2. Restore admin@dolphin.ai password to DEMO_PASSWORD if configured
+        userRepo.findByEmail(demoEmail).ifPresent(admin -> {
+            admin.setPassword(encoder.encode(demoPassword));
+            userRepo.save(admin);
+            log.info("🔑 Auth cleanup: restored {} password to DEMO_PASSWORD value", demoEmail);
+        });
+    }
+
+    /**
+     * Seeds Phase 1 billing tiers: Starter, Growth, Pro, Enterprise.
+     * Prices in INR. Only seeds if no plans exist yet.
+     */
+    private void seedSubscriptionPlans() {
+        if (subscriptionPlanRepo.count() > 0) {
+            log.info("✅ Subscription plans already seeded");
+            return;
+        }
+
+        subscriptionPlanRepo.save(SubscriptionPlan.builder()
+                .name("Starter")
+                .basePriceInr(1999.00)
+                .includedSeats(2)
+                .seatPriceInr(499.00)
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .build());
+
+        subscriptionPlanRepo.save(SubscriptionPlan.builder()
+                .name("Growth")
+                .basePriceInr(4999.00)
+                .includedSeats(5)
+                .seatPriceInr(799.00)
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .build());
+
+        subscriptionPlanRepo.save(SubscriptionPlan.builder()
+                .name("Pro")
+                .basePriceInr(9999.00)
+                .includedSeats(15)
+                .seatPriceInr(999.00)
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .build());
+
+        subscriptionPlanRepo.save(SubscriptionPlan.builder()
+                .name("Enterprise")
+                .basePriceInr(24999.00)
+                .includedSeats(50)
+                .seatPriceInr(1499.00)
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .build());
+
+        log.info("✅ Phase 1 billing tiers seeded: Starter / Growth / Pro / Enterprise (INR)");
     }
 
     private void seedTemplates() {
@@ -74,81 +159,101 @@ public class DataSeeder {
         log.info("✅ 6 initial SaaS workflow templates successfully seeded.");
     }
 
-    private void seedAdminUser() {
-        if (userRepo.existsByEmail(demoEmail)) {
-            log.info("✅ Admin user already exists: {}", demoEmail);
+    private void seedFirstRunOwner() {
+        if (firstRunOwnerEmail == null || firstRunOwnerEmail.isBlank()
+                || firstRunOwnerPassword == null || firstRunOwnerPassword.isBlank()) {
+            log.info("First-run owner bootstrap skipped because FIRST_RUN_OWNER_EMAIL or FIRST_RUN_OWNER_PASSWORD is not configured.");
+            return;
+        }
+        if (userRepo.existsByEmail(firstRunOwnerEmail)) {
+            log.info("First-run owner already exists: {}", firstRunOwnerEmail);
             return;
         }
 
-        // 1. Create Parent Agency Organization
-        Organization agencyOrg = new Organization();
-        agencyOrg.setName("DolphinAI Agency");
-        agencyOrg.setPlan("ENTERPRISE");
-        agencyOrg.setBillingEmail("billing@dolphin.ai");
-        orgRepo.save(agencyOrg);
+        // 1. Create first-run organization
+        Organization organization = new Organization();
+        organization.setName(cleanName(firstRunOrganizationName, "DolphinAI Organization"));
+        organization.setPlan("ENTERPRISE");
+        organization.setBillingEmail(firstRunOwnerEmail);
+        orgRepo.save(organization);
 
-        // 2. Create Isolated client workspaces
-        Workspace w1 = new Workspace();
-        w1.setName("Dolphin eCommerce India");
-        w1.setOrganization(agencyOrg);
-        workspaceRepo.save(w1);
-
-        Workspace w2 = new Workspace();
-        w2.setName("Apex Real Estate Delhi");
-        w2.setOrganization(agencyOrg);
-        workspaceRepo.save(w2);
+        // 2. Create one neutral first-run workspace. Real client workspaces are created by users later.
+        Workspace workspace = new Workspace();
+        workspace.setName(cleanName(firstRunWorkspaceName, "Default Workspace"));
+        workspace.setOrganization(organization);
+        workspaceRepo.save(workspace);
 
         // 3. Create Admin user
         User admin = new User();
-        admin.setEmail(demoEmail);
-        admin.setPassword(encoder.encode(demoPassword));
-        admin.setName("Srivan");
+        admin.setEmail(firstRunOwnerEmail);
+        admin.setPassword(encoder.encode(firstRunOwnerPassword));
+        admin.setName(firstRunOwnerName == null || firstRunOwnerName.isBlank() ? "Owner" : firstRunOwnerName);
         admin.setRole("OWNER");
-        admin.setAccountId(w1.getId()); // dolphin eCommerce India is active default
-        admin.setOrganization(agencyOrg);
+        admin.setAccountId(workspace.getId());
+        admin.setOrganization(organization);
         userRepo.save(admin);
 
-        // 4. Create dynamic empty wallets per workspace
-        Wallet wallet1 = new Wallet();
-        wallet1.setAccountId(w1.getId());
-        wallet1.setBalance(0.0);
-        wallet1.setTotalSpent(0.0);
-        wallet1.setDailyBudgetLimit(5000.0);
-        walletRepo.save(wallet1);
+        // 4. Create empty wallet for the first-run workspace
+        Wallet wallet = new Wallet();
+        wallet.setAccountId(workspace.getId());
+        wallet.setBalance(0.0);
+        wallet.setTotalSpent(0.0);
+        wallet.setDailyBudgetLimit(5000.0);
+        walletRepo.save(wallet);
 
-        Wallet wallet2 = new Wallet();
-        wallet2.setAccountId(w2.getId());
-        wallet2.setBalance(0.0);
-        wallet2.setTotalSpent(0.0);
-        wallet2.setDailyBudgetLimit(5000.0);
-        walletRepo.save(wallet2);
-
-        log.info("✅ Empty workspaces and owner account successfully initialized with zero balances.");
+        log.info("First-run owner and empty workspace initialized for owner email: {}", firstRunOwnerEmail);
     }
 
-    private void seedMetrics(String accountId, Campaign c, double totalSpend,
-                             long totalImps, long totalClicks, long totalConvs, double totalRev) {
-        LocalDate now = LocalDate.now();
-        double dailySpend = totalSpend / 10;
-        long dailyImps = totalImps / 10;
-        long dailyClicks = totalClicks / 10;
-        long dailyConvs = totalConvs / 10;
-        double dailyRev = totalRev / 10;
-
-        for (int i = 9; i >= 0; i--) {
-            MetricSnapshot s = new MetricSnapshot();
-            s.setAccountId(accountId);
-            s.setCampaignId(c.getId());
-            s.setCampaignName(c.getName());
-            s.setSnapshotDate(now.minusDays(i));
-            s.setSpend(dailySpend);
-            s.setImpressions(dailyImps);
-            s.setClicks(dailyClicks);
-            s.setConversions(dailyConvs);
-            s.setRevenue(dailyRev);
-            s.setCtr(dailyImps > 0 ? ((double) dailyClicks / dailyImps) * 100 : 0.0);
-            s.setRoas(dailySpend > 0 ? dailyRev / dailySpend : 0.0);
-            snapshotRepo.save(s);
+    private void seedDemoTeamUsers() {
+        if (isProdProfile()) {
+            log.info("Demo team user seed skipped in production profile.");
+            return;
         }
+        if (!demoUsersEnabled) {
+            return;
+        }
+
+        if (demoEmail == null || demoEmail.isBlank() || demoPassword == null || demoPassword.isBlank()) {
+            log.warn("Demo team user seed skipped because DEMO_EMAIL or DEMO_PASSWORD is not configured.");
+            return;
+        }
+
+        User owner = userRepo.findByEmail(demoEmail).orElse(null);
+        if (owner == null || owner.getWorkspaceId() == null) {
+            return;
+        }
+
+        seedDemoUser("workspace.admin@dolphin.ai", "Admin User", "ADMIN", owner);
+        seedDemoUser("manager@dolphin.ai", "Manager User", "MANAGER", owner);
+        seedDemoUser("employee@dolphin.ai", "Employee User", "EMPLOYEE", owner);
+        seedDemoUser("viewer@dolphin.ai", "Viewer User", "VIEWER", owner);
     }
+
+    private void seedDemoUser(String email, String name, String role, User owner) {
+        if (userRepo.existsByEmail(email)) {
+            return;
+        }
+        User user = new User();
+        user.setEmail(email);
+        user.setPassword(encoder.encode(demoPassword));
+        user.setName(name);
+        user.setRole(role);
+        user.setAccountId(owner.getWorkspaceId());
+        user.setOrganization(owner.getOrganization());
+        userRepo.save(user);
+        log.info("✅ Demo {} user seeded: {}", role, email);
+    }
+
+    private boolean isProdProfile() {
+        return Arrays.asList(environment.getActiveProfiles()).contains("prod");
+    }
+
+    private String cleanName(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        String cleaned = value.replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", "").trim();
+        return cleaned.length() <= 120 ? cleaned : cleaned.substring(0, 120);
+    }
+
 }

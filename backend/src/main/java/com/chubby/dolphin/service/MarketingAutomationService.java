@@ -22,6 +22,7 @@ public class MarketingAutomationService {
     private final LeadRepository leadRepo;
     private final LeadPipelineTrackingService pipelineTrackingService;
     private final WorkflowService workflowService;
+    private final LocalApprovalSafetyService localApprovalSafetyService;
     private final ObjectMapper mapper;
 
     public MarketingAutomationService(MarketingFormRepository formRepo,
@@ -30,6 +31,7 @@ public class MarketingAutomationService {
                                       LeadRepository leadRepo,
                                       LeadPipelineTrackingService pipelineTrackingService,
                                       WorkflowService workflowService,
+                                      LocalApprovalSafetyService localApprovalSafetyService,
                                       ObjectMapper mapper) {
         this.formRepo = formRepo;
         this.landingPageRepo = landingPageRepo;
@@ -37,6 +39,7 @@ public class MarketingAutomationService {
         this.leadRepo = leadRepo;
         this.pipelineTrackingService = pipelineTrackingService;
         this.workflowService = workflowService;
+        this.localApprovalSafetyService = localApprovalSafetyService;
         this.mapper = mapper;
     }
 
@@ -159,6 +162,16 @@ public class MarketingAutomationService {
 
         pipelineTrackingService.recordLeadCreated(workspaceId, savedLead.getId(), "Lead captured from form: " + form.getName());
         if (Boolean.TRUE.equals(form.getTriggerAutomation())) {
+            if (localApprovalSafetyService.shouldRequireApprovalOnly("WORKFLOW_FORM_TRIGGER")) {
+                localApprovalSafetyService.auditBlockedExecution(
+                        workspaceId,
+                        "WORKFLOW_FORM_TRIGGER",
+                        "WorkflowExecution",
+                        null,
+                        "Blocked form-triggered workflow before workflow row creation or n8n webhook call."
+                );
+                return savedSubmission;
+            }
             workflowService.triggerWorkflow("system", "form-" + savedSubmission.getId(),
                     "New lead submitted form " + form.getName() + ". Follow configured automation only.", workspaceId);
         }

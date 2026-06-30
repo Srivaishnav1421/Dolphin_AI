@@ -1,216 +1,305 @@
 <div class="page animate-fade-in">
-
-  <!-- Header -->
   <div class="page-header">
     <div>
-      <h1>Executive Dashboard</h1>
-      <p>Real-time overview of business performance and growth opportunities.</p>
+      <h1>Grow Faster. Work Smarter.</h1>
+      <p class="page-header__sub">Your AI Growth Operating System for leads, campaigns, automations, customer follow-ups, and revenue decisions.</p>
     </div>
     <div class="dash-status">
       <span class="live-dot"></span>
       <span class="dash-status__label" [style.color]="wsAlive() ? 'var(--success)' : 'var(--text-muted)'">
-        {{ wsAlive() ? 'System Connected' : 'Connecting to Core…' }}
+        {{ wsAlive() ? 'Connected' : 'Checking status' }}
       </span>
-      <button class="btn btn-ghost" (click)="loadData()">
-        <span class="material-symbols-outlined font-icon">refresh</span> Refresh
+      <button class="btn btn-ghost btn-sm" (click)="loadData()">
+        <app-icon name="refresh" [size]="15"></app-icon>
+        Refresh
       </button>
     </div>
   </div>
 
+  <section class="role-dashboard-band">
+    <div>
+      <span class="metric-label">{{ auth.currentUser()?.role || 'VIEWER' }} view</span>
+      <h2>{{ roleProfile.title }}</h2>
+      <p>{{ roleProfile.focus }}</p>
+    </div>
+    <div class="role-dashboard-band__meta">
+      <span>{{ roleProfile.scope }}</span>
+      <strong>{{ roleProfile.access }}</strong>
+    </div>
+  </section>
+
   @if (loading()) {
-    <div class="loading-grid">
-      @for (_ of [1,2,3,4,5]; track $index) {
+    <div class="premium-grid">
+      @for (_ of [1,2,3,4]; track $index) {
         <div class="skeleton-card"></div>
       }
     </div>
+  } @else if (loadError()) {
+    <div class="dashboard-error-banner">
+      <app-icon name="error" [size]="20"></app-icon>
+      <span>{{ loadError() }}</span>
+      <button class="btn btn-ghost btn-sm" (click)="loadData()">Retry</button>
+    </div>
   } @else if (summary(); as s) {
-
-    <!-- Section 1: KPI Stats Cards -->
-    <div class="stats-grid">
-      <!-- Total Revenue -->
-      <div class="stat-card">
-        <div class="stat-card__icon" style="background: rgba(5,150,105,0.08); color: var(--success)">
-          <span class="material-symbols-outlined">trending_up</span>
-        </div>
+    <div class="premium-grid">
+      <div class="metric-card">
         <div>
-          <div class="metric-label">Total Revenue</div>
-          <div class="metric-val">₹{{ s.total_revenue | number:'1.0-0' }}</div>
+          <span class="metric-card__icon"><app-icon name="insights" [size]="22"></app-icon></span>
+          <div class="metric-card__label">How business is growing</div>
+          <div class="metric-card__value">₹{{ s.total_revenue | number:'1.0-0' }}</div>
+        </div>
+        <div class="metric-card__footer">
+          <span>ROAS {{ s.blended_roas | number:'1.2-2' }}x</span>
+          <span [class]="revenueHealthClass(s)">{{ revenueHealthLabel(s) }}</span>
         </div>
       </div>
 
-      <!-- Total Leads -->
-      <div class="stat-card">
-        <div class="stat-card__icon" style="background: rgba(37,99,235,0.08); color: var(--accent)">
-          <span class="material-symbols-outlined">group</span>
-        </div>
+      <div class="metric-card">
         <div>
-          <div class="metric-label">Total Leads</div>
-          <div class="metric-val">{{ totalLeads() }}</div>
+          <span class="metric-card__icon"><app-icon name="group" [size]="22"></app-icon></span>
+          <div class="metric-card__label">More leads generated</div>
+          <div class="metric-card__value">{{ totalLeads() }}</div>
+        </div>
+        <div class="metric-card__footer">
+          <span>Hot {{ s.hot_leads }}</span>
+          <span>Warm {{ s.warm_leads }}</span>
+          <span>Cold {{ s.cold_leads }}</span>
         </div>
       </div>
 
-      <!-- Blended ROAS -->
-      <div class="stat-card">
-        <div class="stat-card__icon" style="background: rgba(217,119,6,0.08); color: var(--warning)">
-          <span class="material-symbols-outlined">bolt</span>
-        </div>
+      <div class="metric-card">
         <div>
-          <div class="metric-label">Blended ROAS</div>
-          <div class="metric-val">{{ s.blended_roas | number:'1.2-2' }}x</div>
+          <span class="metric-card__icon"><app-icon name="campaign" [size]="22"></app-icon></span>
+          <div class="metric-card__label">Campaigns running better</div>
+          <div class="metric-card__value">{{ s.active_campaigns }} active</div>
+        </div>
+        <div class="metric-card__footer">
+          <span>Spend ₹{{ s.total_spend | number:'1.0-0' }}</span>
+          <span>{{ spendPct.toFixed(0) }}% used</span>
         </div>
       </div>
 
-      <!-- Active Campaigns -->
-      <div class="stat-card">
-        <div class="stat-card__icon" style="background: rgba(37,99,235,0.08); color: var(--accent)">
-          <span class="material-symbols-outlined">campaign</span>
-        </div>
+      <div class="metric-card">
         <div>
-          <div class="metric-label">Active Campaigns</div>
-          <div class="metric-val">{{ s.active_campaigns }}</div>
+          <span class="metric-card__icon"><app-icon name="auto_awesome" [size]="22"></app-icon></span>
+          <div class="metric-card__label">Daily work automated</div>
+          <div class="metric-card__value">{{ s.automation?.active ?? 0 }} active</div>
         </div>
-      </div>
-
-      <!-- Pending Approvals Count -->
-      <div class="stat-card">
-        <div class="stat-card__icon" style="background: rgba(220,38,38,0.08); color: var(--danger)">
-          <span class="material-symbols-outlined">notification_important</span>
-        </div>
-        <div>
-          <div class="metric-label">Pending Approvals</div>
-          <div class="metric-val">{{ recommendations().length }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 2: AI Brain Summary (Opportunities & Risks) -->
-    <div class="grid-2" style="margin-bottom: 24px;">
-      
-      <!-- Top 3 Opportunities -->
-      <div class="card">
-        <div class="card-header-flex">
-          <h3 class="card-title">💡 Top 3 Growth Opportunities</h3>
-        </div>
-        <div class="recommendations-container">
-          @for (opp of opportunities(); track opp.id) {
-            <div class="decision-box" style="border-left: 3px solid var(--success)">
-              <div class="decision-box-header">
-                <div>
-                  <span class="badge active">{{ opp.decision_type }}</span>
-                  <strong class="campaign-name" style="margin-left: 8px">{{ opp.campaign_name || 'System' }}</strong>
-                </div>
-                <span class="confidence-pct" style="color: var(--success)">
-                  {{ ((opp.confidenceScore || opp.confidence || 0.8) * 100).toFixed(0) }}% Impact
-                </span>
-              </div>
-              <p class="decision-desc">{{ opp.action }}</p>
-            </div>
-          } @empty {
-            <div class="empty-state" style="padding: 20px 0;">
-              <span class="material-symbols-outlined icon">check_circle</span>
-              <p>No growth opportunities at this moment.</p>
-            </div>
-          }
-        </div>
-      </div>
-
-      <!-- Top 3 Risks -->
-      <div class="card">
-        <div class="card-header-flex">
-          <h3 class="card-title">⚠️ Top 3 Business Risks</h3>
-        </div>
-        <div class="recommendations-container">
-          @for (risk of risks(); track risk.id) {
-            <div class="decision-box" style="border-left: 3px solid var(--danger)">
-              <div class="decision-box-header">
-                <div>
-                  <span class="badge hot">{{ risk.decision_type }}</span>
-                  <strong class="campaign-name" style="margin-left: 8px">{{ risk.campaign_name || 'System' }}</strong>
-                </div>
-                <span class="confidence-pct" style="color: var(--danger)">
-                  {{ ((risk.riskScore || 0.6) * 100).toFixed(0) }}% Risk
-                </span>
-              </div>
-              <p class="decision-desc">{{ risk.action }}</p>
-            </div>
-          } @empty {
-            <div class="empty-state" style="padding: 20px 0;">
-              <span class="material-symbols-outlined icon">check_circle</span>
-              <p>No major risks detected. Health is optimal.</p>
-            </div>
-          }
-        </div>
-      </div>
-      
-    </div>
-
-    <!-- Section 3 & 4: Pending Approvals & Recent Activity -->
-    <div class="grid-2 dash-lower">
-
-      <!-- Section 3: Pending Approvals Actions -->
-      <div class="card decision-card-container">
-        <div class="card-header-flex">
-          <h3 class="card-title">🛡️ Actions Requiring Approval</h3>
-          <span class="badge" [class.hot]="recommendations().length > 0" [class.unqualifiable]="recommendations().length === 0">
-            {{ recommendations().length }} Pending
+        <div class="metric-card__footer">
+          <span>{{ s.automation?.completed ?? 0 }} completed</span>
+          <span [class.text-success]="(s.automation?.failed ?? 0) === 0">
+            {{ s.automation?.failed ?? 0 }} failed
           </span>
+          <span>{{ ((s.automation?.average_duration_ms ?? 0) / 1000) | number:'1.1-1' }}s avg</span>
         </div>
+      </div>
+    </div>
 
+    <div class="card ad-brain-run-card">
+      <div>
+        <h2 class="section-heading">Ad Brain manual run</h2>
+        <p class="muted-copy">
+          Review active campaigns with deterministic math, then send risky recommendations to approvals.
+        </p>
+      </div>
+      <div class="ad-brain-run-card__stats">
+        <div>
+          <span class="metric-label">Last run</span>
+          <strong>{{ lastAdBrainRunLabel }}</strong>
+        </div>
+        <div>
+          <span class="metric-label">Campaigns evaluated</span>
+          <strong>{{ adBrainStatus()?.campaigns_evaluated ?? 0 }}</strong>
+        </div>
+        <div>
+          <span class="metric-label">Approvals created</span>
+          <strong>{{ adBrainStatus()?.approval_items_created ?? 0 }}</strong>
+        </div>
+        <div>
+          <span class="metric-label">Risks detected</span>
+          <strong>{{ adBrainStatus()?.risks_created ?? 0 }}</strong>
+        </div>
+        <div>
+          <span class="metric-label">Opportunities found</span>
+          <strong>{{ adBrainStatus()?.opportunities_created ?? 0 }}</strong>
+        </div>
+      </div>
+      <div class="action-row">
+        @if (adBrainMessage()) {
+          <span class="status-badge status-connected">{{ adBrainMessage() }}</span>
+        }
+        @if (adBrainError()) {
+          <span class="status-badge status-error">{{ adBrainError() }}</span>
+        }
+        <button class="btn btn-primary" (click)="runAdBrain()" [disabled]="adBrainRunning()">
+          <app-icon name="auto_awesome" [size]="16"></app-icon>
+          @if (adBrainRunning()) { Running Ad Brain... } @else { Run Ad Brain }
+        </button>
+      </div>
+    </div>
+
+    <div class="card dashboard-integrations">
+      <div>
+        <h2 class="section-heading">What to connect next</h2>
+        <p class="muted-copy">
+          Connect ads, WhatsApp, AI, and automation tools once, then keep growth work flowing from a single secure place.
+        </p>
+      </div>
+
+      <div class="integration-readiness-grid">
+        @for (item of [
+          { key: 'meta', label: 'Meta Ads', icon: 'campaign' },
+          { key: 'whatsapp', label: 'WhatsApp', icon: 'chat' },
+          { key: 'google', label: 'Google Ads', icon: 'search' },
+          { key: 'ai', label: 'AI Tools', icon: 'auto_awesome' },
+          { key: 'n8n', label: 'n8n', icon: 'account_tree' }
+        ]; track item.key) {
+          <div class="readiness-item">
+            <div>
+              <span class="readiness-item__icon"><app-icon [name]="item.icon" [size]="18"></app-icon></span>
+              <span>{{ item.label }}</span>
+            </div>
+          <span class="status-badge"
+                [class.status-connected]="integrationStatus(item.key) === 'connected'"
+                [class.status-needs-setup]="integrationStatus(item.key) === 'needs-setup'"
+                [class.status-needs-validation]="integrationStatus(item.key) === 'needs-validation'"
+                [class.status-error]="integrationStatus(item.key) === 'error'">
+            {{ statusLabel(integrationStatus(item.key)) }}
+          </span>
+          </div>
+        }
+      </div>
+
+      <div class="action-row">
+        @if (integrationStatusError()) {
+          <p class="integration-status-warning">
+            <app-icon name="info" [size]="14"></app-icon>
+            {{ integrationStatusError() }}
+          </p>
+        }
+        <button class="btn btn-primary" (click)="goToIntegrations()">Connect integrations</button>
+        <button class="btn btn-ghost" routerLink="/leads">Open CRM</button>
+      </div>
+    </div>
+
+    <div class="growth-home-grid">
+      <section class="card">
+        <div class="card-header-flex">
+          <h2 class="card-title">Growth Opportunities</h2>
+          <button class="btn btn-ghost btn-sm" routerLink="/ad-brain">Review</button>
+        </div>
         <div class="recommendations-container">
-          @for (rec of recommendations(); track rec.id) {
+          @for (item of opportunities(); track item.id) {
             <div class="decision-box">
               <div class="decision-box-header">
-                <div>
-                  <span class="badge warm">{{ rec.decision_type }}</span>
-                  <strong class="campaign-name" style="margin-left: 8px">{{ rec.campaign_name || 'Global System Action' }}</strong>
-                </div>
-                <span class="confidence-pct" [style.color]="confidenceColor(rec.confidence || 0.8)">
-                  {{ ((rec.confidence || 0.8) * 100).toFixed(0) }}% Confidence
+                <span class="campaign-name">{{ item.campaign_name || item.decision_type }}</span>
+                <span class="confidence-pct" [style.color]="confidenceColor(item.confidence || 0)">
+                  {{ ((item.confidence || 0) * 100) | number:'1.0-0' }}%
                 </span>
               </div>
-              <p class="decision-desc">{{ rec.action }}</p>
-              @if (rec.reason) {
-                <div class="decision-reason">
-                  <strong>Rationale:</strong> {{ rec.reason }}
-                </div>
+              <p class="decision-desc">{{ item.action }}</p>
+              @if (item.reason) {
+                <div class="decision-reason">{{ item.reason }}</div>
               }
+            </div>
+          } @empty {
+            <p class="muted-copy">No growth opportunities found right now.</p>
+          }
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header-flex">
+          <h2 class="card-title">Risks To Watch</h2>
+          <button class="btn btn-ghost btn-sm" routerLink="/campaigns">Campaigns</button>
+        </div>
+        <div class="recommendations-container">
+          @for (item of risks(); track item.id) {
+            <div class="decision-box">
+              <div class="decision-box-header">
+                <span class="campaign-name">{{ item.campaign_name || item.decision_type }}</span>
+                <span class="confidence-pct" [style.color]="confidenceColor(item.confidence || 0)">
+                  {{ ((item.confidence || 0) * 100) | number:'1.0-0' }}%
+                </span>
+              </div>
+              <p class="decision-desc">{{ item.action }}</p>
+              @if (item.reason) {
+                <div class="decision-reason">{{ item.reason }}</div>
+              }
+            </div>
+          } @empty {
+            <p class="muted-copy">No critical risks detected.</p>
+          }
+        </div>
+      </section>
+    </div>
+
+    <div class="growth-home-grid">
+      <section class="card">
+        <div class="card-header-flex">
+          <h2 class="card-title">Pending Approvals</h2>
+          <span class="status-badge" [class.status-connected]="pendingApprovals().length === 0">
+            {{ pendingApprovals().length }} waiting
+          </span>
+        </div>
+        <div class="recommendations-container">
+          @if (approvalsError()) {
+            <div class="dashboard-error-banner dashboard-error-banner--compact">
+              <app-icon name="error" [size]="16"></app-icon>
+              <span>{{ approvalsError() }}</span>
+            </div>
+          }
+          @for (item of pendingApprovals(); track item.id) {
+            <div class="decision-box">
+              <div class="decision-box-header">
+                <span class="campaign-name">{{ item.title }}</span>
+                <span class="status-badge"
+                      [class.status-error]="item.severity === 'CRITICAL'"
+                      [class.status-needs-setup]="item.severity === 'HIGH'"
+                      [class.status-needs-validation]="item.severity === 'MEDIUM'"
+                      [class.status-connected]="item.severity === 'LOW'">
+                  {{ item.severity }}
+                </span>
+              </div>
+              <p class="decision-desc">{{ item.description || item.action_type }}</p>
+              <div class="decision-reason">{{ item.source_module }} · {{ item.action_type }}</div>
               <div class="decision-actions">
-                <button class="btn btn-ghost" (click)="rejectDecision(rec.id)">Decline</button>
-                <button class="btn btn-primary" (click)="approveDecision(rec.id)">Approve & Execute</button>
+                <button class="btn btn-ghost btn-sm" (click)="rejectApproval(item.id)">Reject</button>
+                <button class="btn btn-primary btn-sm" (click)="approveApproval(item.id)">Approve</button>
               </div>
             </div>
           } @empty {
-            <div class="empty-state">
-              <span class="material-symbols-outlined icon">check_circle</span>
-              <p>All AI decisions executed or resolved.</p>
-            </div>
+            @if (!approvalsError()) {
+              <p class="muted-copy">No approvals waiting.</p>
+            }
           }
         </div>
-      </div>
+      </section>
 
-      <!-- Section 4: Recent Activity Feed -->
-      <div class="card">
+      <section class="card">
         <div class="card-header-flex">
-          <h3 class="card-title">⏱️ Recent Activity Feed</h3>
+          <h2 class="card-title">Recent Activity</h2>
+          <span class="status-badge" [class.status-connected]="wsAlive()">
+            {{ wsAlive() ? 'Live' : 'Polling' }}
+          </span>
         </div>
-        <div class="events-list" style="max-height: 400px;">
-          @for (ev of events(); track ev.id) {
-            <div class="event-row animate-fade-in" style="padding: 10px 0;">
-              <span class="badge {{ severityClass(ev.severity) }}" style="font-size: 9px; padding: 2px 6px; min-width: 65px; text-align: center; display: inline-block;">
-                {{ ev.event_type || ev.severity }}
+        <div class="events-list">
+          @for (event of events(); track event.id) {
+            <div class="event-row">
+              <span class="status-badge"
+                    [class.status-connected]="event.severity === 'SUCCESS'"
+                    [class.status-error]="event.severity === 'CRITICAL'"
+                    [class.status-needs-setup]="event.severity === 'WARNING'">
+                {{ event.severity }}
               </span>
-              <span class="event-msg" style="margin-left: 8px;">{{ ev.message }}</span>
-              <span class="event-time">{{ ev.created_at | date:'mediumTime' }}</span>
+              <span class="event-msg">{{ event.message }}</span>
+              <span class="event-time">{{ event.created_at | date:'shortTime' }}</span>
             </div>
           } @empty {
-            <div class="empty-state" style="padding: 40px 20px;">
-              <p>No activity log recorded in this session.</p>
-            </div>
+            <p class="muted-copy">No recent activity yet.</p>
           }
         </div>
-      </div>
-
+      </section>
     </div>
   }
-
 </div>

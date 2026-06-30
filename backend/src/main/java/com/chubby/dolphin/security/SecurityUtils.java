@@ -21,7 +21,7 @@ public class SecurityUtils {
         if (tenantId != null && !tenantId.isBlank()) {
             return tenantId;
         }
-        return currentUser().getWorkspaceId();
+        throw new TenantAccessService.TenantAccessDeniedException("Workspace context required");
     }
 
     @Deprecated

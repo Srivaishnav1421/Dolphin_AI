@@ -52,7 +52,7 @@ public class AdvantageExperimentService {
     public AdvantageExperiment proposeAdvantagePlusExperiment(String workspaceId, String campaignId) {
         log.info("📊 Evaluating campaign {} for Advantage+ optimization eligibility...", campaignId);
 
-        Campaign campaign = campaignRepo.findById(campaignId).orElse(null);
+        Campaign campaign = campaignRepo.findByIdAndWorkspaceId(campaignId, workspaceId).orElse(null);
         if (campaign == null) {
             log.warn("Campaign {} not found.", campaignId);
             return null;
@@ -94,11 +94,12 @@ public class AdvantageExperimentService {
         MetaConnection conn = metaConnRepo.findFirstByAccountIdAndTokenStatus(workspaceId, "VALID").orElse(null);
 
         if (conn == null || conn.getAccessToken() == null || experiment.getMetaCampaignId() == null) {
-            log.warn("No active Meta connection or Campaign ID. Activating experiment in mock simulation mode.");
-            experiment.setStatus("ACTIVE");
-            experiment.setSwitchedAt(LocalDateTime.now());
+            log.warn("No active Meta connection or Meta campaign ID. Advantage+ activation blocked for experiment {}.", experimentId);
+            experiment.setStatus("ACTIVATION_BLOCKED");
+            experiment.setRevertReason("Activation blocked: connect a valid Meta account and synced Meta campaign before enabling Advantage+.");
             experiment.setUpdatedAt(LocalDateTime.now());
-            return experimentRepo.save(experiment);
+            experimentRepo.save(experiment);
+            throw new IllegalStateException("Advantage+ activation requires a valid Meta connection and synced Meta campaign.");
         }
 
         try {
@@ -125,12 +126,23 @@ public class AdvantageExperimentService {
             return experimentRepo.save(experiment);
 
         } catch (Exception e) {
-            log.error("❌ Failed to push Advantage+ toggle to Meta API: {}. Activating local simulation mode.", e.getMessage());
-            experiment.setStatus("ACTIVE");
-            experiment.setSwitchedAt(LocalDateTime.now());
+            log.error("❌ Failed to push Advantage+ toggle to Meta API: {}", e.getMessage());
+            experiment.setStatus("ACTIVATION_FAILED");
+            experiment.setRevertReason("Meta activation failed: " + e.getMessage());
             experiment.setUpdatedAt(LocalDateTime.now());
-            return experimentRepo.save(experiment);
+            experimentRepo.save(experiment);
+            throw new IllegalStateException("Meta Advantage+ activation failed. No local simulation was applied.", e);
         }
+    }
+
+    public AdvantageExperiment activateAdvantagePlus(String experimentId, String workspaceId) {
+        log.info("⚡ Activating Advantage+ targeting suite for experiment: {} in workspace: {}", experimentId, workspaceId);
+        AdvantageExperiment experiment = experimentRepo.findByIdAndWorkspaceId(experimentId, workspaceId).orElse(null);
+        if (experiment == null) {
+            log.warn("Experiment {} not found in workspace {}.", experimentId, workspaceId);
+            return null;
+        }
+        return activateAdvantagePlus(experiment.getId());
     }
 
     /**
@@ -186,6 +198,55 @@ public class AdvantageExperimentService {
         }
     }
 
+    public void evaluateActiveExperiments(String workspaceId) {
+        log.info("🔍 Advantage+ Experiment Evaluator: Assessing active campaigns for workspace: {}", workspaceId);
+        List<AdvantageExperiment> activeList = experimentRepo.findByWorkspaceId(workspaceId).stream()
+                .filter(exp -> "ACTIVE".equals(exp.getStatus()))
+                .toList();
+        for (AdvantageExperiment exp : activeList) {
+            Campaign campaign = campaignRepo.findByIdAndWorkspaceId(exp.getCampaignId(), workspaceId).orElse(null);
+            if (campaign == null) {
+                continue;
+            }
+
+            double currentRoas = campaign.getRoas() != null ? campaign.getRoas() : 0.0;
+            double roasBefore = exp.getRoasBefore() != null ? exp.getRoasBefore() : 1.0;
+            double delta = currentRoas - roasBefore;
+
+            exp.setNetRoasDelta(delta);
+            exp.setUpdatedAt(LocalDateTime.now());
+
+            long daysSinceSwitch = exp.getSwitchedAt() != null
+                    ? ChronoUnit.DAYS.between(exp.getSwitchedAt(), LocalDateTime.now())
+                    : 0L;
+
+            if (daysSinceSwitch >= 30 && exp.getRoasAfter30d() == null) {
+                exp.setRoasAfter30d(currentRoas);
+            } else if (daysSinceSwitch >= 14 && exp.getRoasAfter14d() == null) {
+                exp.setRoasAfter14d(currentRoas);
+            }
+
+            boolean shouldRevert = false;
+            String reason = "";
+            if (currentRoas < 1.1) {
+                shouldRevert = true;
+                reason = String.format("ROAS plummeted to critical level (%.2f < 1.10)", currentRoas);
+            } else if (currentRoas < roasBefore * 0.65) {
+                shouldRevert = true;
+                reason = String.format("ROAS dropped by more than 35%% of starting ROAS (Before: %.2f | Now: %.2f)", roasBefore, currentRoas);
+            }
+
+            if (shouldRevert) {
+                triggerSafetyRollback(exp, campaign, reason);
+            } else if (daysSinceSwitch >= 30 && delta > 0.3) {
+                exp.setStatus("SUCCESS");
+                experimentRepo.save(exp);
+            } else {
+                experimentRepo.save(exp);
+            }
+        }
+    }
+
     /**
      * Executes the safety rollback. Toggles the Meta targeting options back to manual
      * and records the reversion parameters.
@@ -234,7 +295,7 @@ public class AdvantageExperimentService {
                                                    List<String> headlines, List<String> bodies, List<String> ctas) {
         log.info("Creating approval-required Advantage+ Experiment with 27 copy permutations for campaign: {}", campaignId);
 
-        Campaign campaign = campaignRepo.findById(campaignId)
+        Campaign campaign = campaignRepo.findByIdAndWorkspaceId(campaignId, workspaceId)
                 .orElseThrow(() -> new RuntimeException("Campaign not found: " + campaignId));
 
         String abTestId = "ab-" + java.util.UUID.randomUUID().toString().substring(0, 8);
