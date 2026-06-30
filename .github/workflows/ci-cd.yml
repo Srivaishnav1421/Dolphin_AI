@@ -35,7 +35,7 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
       - name: Run tests
-        run: mvn test -pl backend -q
+        run: mvn -f backend/pom.xml test -q
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/chubbydb_test
           SPRING_DATASOURCE_USERNAME: chubby
