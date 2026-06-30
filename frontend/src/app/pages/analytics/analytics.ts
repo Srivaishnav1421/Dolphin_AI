@@ -1,44 +1,37 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
-import { AuthService } from '../../core/services/auth.service';
-import { EmasMetrics } from '../../shared/models';
-import { UiPanel } from '../../shared/ui';
+import { AnalyticsSummary } from '../../shared/models';
 
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [CommonModule, DecimalPipe, UiPanel],
+  imports: [CommonModule, DecimalPipe],
   templateUrl: './analytics.html',
   styleUrl: './analytics.scss',
 })
 export class Analytics implements OnInit {
-  metrics = signal<EmasMetrics | null>(null);
+  summary = signal<AnalyticsSummary | null>(null);
   loading = signal(true);
-  running = signal(false);
   message = signal('');
 
-  constructor(private api: ApiService, private auth: AuthService) {}
+  constructor(private api: ApiService) {}
 
   ngOnInit() { this.load(); }
 
   load() {
-    const accountId = this.auth.currentUser()?.account_id;
-    if (!accountId) { this.loading.set(false); return; }
     this.loading.set(true);
-    this.api.getEmasMetrics(accountId).subscribe({
-      next: m => { this.metrics.set(m); this.loading.set(false); },
-      error: () => this.loading.set(false),
-    });
-  }
-
-  runArbitrage() {
-    const accountId = this.auth.currentUser()?.account_id;
-    if (!accountId) return;
-    this.running.set(true);
-    this.api.runArbitrage(accountId).subscribe({
-      next: () => { this.message.set('✅ Arbitrage executed!'); this.running.set(false); this.load(); setTimeout(() => this.message.set(''), 3000); },
-      error: () => { this.message.set('❌ Failed.'); this.running.set(false); },
+    this.message.set('');
+    this.api.getAnalyticsSummary().subscribe({
+      next: summary => {
+        this.summary.set(summary);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.summary.set(null);
+        this.message.set('Could not load analytics. Check backend and database connection.');
+        this.loading.set(false);
+      },
     });
   }
 
@@ -47,9 +40,14 @@ export class Analytics implements OnInit {
     if (roas >= 1.5) return 'var(--warning)';
     return 'var(--danger)';
   }
-  merHealth(mer: number) {
-    if (mer >= 4) return 'var(--success)';
-    if (mer >= 2) return 'var(--warning)';
+
+  approvalHealth(pending: number) {
+    if (pending === 0) return 'var(--success)';
+    if (pending <= 5) return 'var(--warning)';
     return 'var(--danger)';
+  }
+
+  sectionState(empty: boolean) {
+    return empty ? 'No records yet' : 'DB-backed';
   }
 }

@@ -1,5 +1,36 @@
 .msg-chip { font-size: 13px; color: var(--success); font-weight: 500; }
 .score-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+.math-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+.math-breakdown div {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  min-width: 0;
+}
+.math-breakdown span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.math-breakdown strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.math-explanations {
+  margin-top: 8px;
+}
+.math-explanations p {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
 .loading-rows { display: flex; flex-direction: column; gap: 10px; }
 .skeleton-row { height: 52px; border-radius: 8px; background: var(--bg-card); animation: shimmer 1.4s infinite; background-size: 200% 100%; background-image: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%); }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
@@ -21,4 +52,3 @@
   background: var(--border);
   border-radius: 2px;
 }
-

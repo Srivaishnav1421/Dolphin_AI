@@ -12,24 +12,27 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @Slf4j
 public class HuggingFaceAiService implements AIService {
 
     private final WebClient webClient;
+    private final WorkspaceAiCredentialService credentialService;
     private final boolean enabled;
-    private final String apiKey;
+    private final String envApiKey;
     private final String model;
     private final String baseUrl;
 
-    public HuggingFaceAiService(
+    public HuggingFaceAiService(WorkspaceAiCredentialService credentialService,
             @Value("${ai.huggingface.enabled:true}") boolean enabled,
             @Value("${ai.huggingface.api-key:}") String apiKey,
             @Value("${ai.huggingface.model:meta-llama/Llama-3.1-8B-Instruct}") String model,
             @Value("${ai.huggingface.base-url:https://api-inference.huggingface.co/models}") String baseUrl) {
+        this.credentialService = credentialService;
         this.enabled = enabled;
-        this.apiKey = apiKey;
+        this.envApiKey = apiKey;
         this.model = model;
         this.baseUrl = baseUrl;
         this.webClient = WebClient.builder()
@@ -42,6 +45,7 @@ public class HuggingFaceAiService implements AIService {
     public LlmResponse ask(LlmRequest request) {
         String prompt = request.getPrompt();
         String systemPrompt = request.getSystemPrompt();
+        String apiKey = resolveApiKey(request.getWorkspaceId()).orElse("");
 
         // 1. Construct prompt
         String fullPrompt = prompt;
@@ -109,22 +113,28 @@ public class HuggingFaceAiService implements AIService {
 
     @Override
     public boolean isAvailable() {
-        if (!enabled) {
-            return false;
-        }
+        return enabled && envApiKey != null && !envApiKey.isBlank();
+    }
+
+    public boolean validateWorkspaceConnection(String workspaceId) {
+        String apiKey = resolveApiKey(workspaceId)
+                .orElseThrow(() -> new IllegalStateException("Hugging Face API key is not configured for this workspace"));
         try {
             WebClient client = WebClient.builder()
-                    .baseUrl("https://huggingface.co")
+                    .baseUrl(baseUrl)
                     .build();
-            String response = client.get()
+            String response = client.post()
+                    .uri("/" + model)
+                    .header("Authorization", "Bearer " + apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(Map.of("inputs", "Reply with exactly: ok"))
                     .retrieve()
                     .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(5))
+                    .timeout(Duration.ofSeconds(20))
                     .block();
             return response != null;
         } catch (Exception e) {
-            log.debug("HuggingFace availability check failed: {}", e.getMessage());
-            return false;
+            throw new RuntimeException("HuggingFace provider failed: " + e.getMessage(), e);
         }
     }
 
@@ -141,5 +151,13 @@ public class HuggingFaceAiService implements AIService {
     @Override
     public String getModelName() {
         return model;
+    }
+
+    private Optional<String> resolveApiKey(String workspaceId) {
+        Optional<String> workspaceKey = credentialService.apiKey(workspaceId, "huggingface");
+        if (workspaceKey.isPresent()) {
+            return workspaceKey;
+        }
+        return envApiKey == null || envApiKey.isBlank() ? Optional.empty() : Optional.of(envApiKey.trim());
     }
 }

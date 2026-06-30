@@ -1,0 +1,77 @@
+package com.chubby.dolphin.rbac;
+
+public enum Permission {
+    VIEW_ORGANIZATION,
+    VIEW_WORKSPACE,
+    CREATE_WORKSPACE,
+    MANAGE_WORKSPACE,
+    VIEW_MEMBERS,
+    MANAGE_MEMBERS,
+    SWITCH_WORKSPACE,
+    VIEW_AUDIT_LOGS,
+
+    WORKSPACE_READ,
+    WORKSPACE_MANAGE,
+    MEMBER_READ,
+    MEMBER_MANAGE,
+    AUDIT_READ,
+
+    LEAD_READ,
+    LEAD_CREATE,
+    LEAD_UPDATE,
+    LEAD_DELETE,
+    LEAD_ASSIGN,
+    LEAD_SCORE,
+    LEAD_ACTIVITY_ADD,
+
+    CAMPAIGN_READ,
+    CAMPAIGN_CREATE,
+    CAMPAIGN_UPDATE,
+    CAMPAIGN_DELETE,
+    CAMPAIGN_PAUSE,
+    CAMPAIGN_RESUME,
+    CAMPAIGN_APPROVE_AI_ACTION,
+    CAMPAIGN_METRICS_READ,
+    MATH_ENGINE_RUN,
+
+    CREATIVE_READ,
+    CREATIVE_GENERATE,
+    CREATIVE_UPDATE,
+    CREATIVE_DELETE,
+    AUTOMATION_READ,
+    AUTOMATION_MANAGE,
+    AD_BRAIN_READ,
+    AD_BRAIN_RUN,
+    APPROVAL_READ,
+    APPROVAL_MANAGE,
+    APPROVAL_EXECUTE,
+    ANALYTICS_READ,
+    REPORT_READ,
+    REPORT_EXPORT,
+    FILE_READ,
+    FILE_MANAGE,
+    NOTIFICATION_READ,
+    TASK_READ,
+    TASK_MANAGE,
+
+    INTEGRATION_READ,
+    INTEGRATION_MANAGE,
+    AI_PROVIDER_READ,
+    AI_PROVIDER_MANAGE,
+    AI_ROUTE_READ,
+    AI_ROUTE_MANAGE,
+
+    BILLING_READ,
+    BILLING_MANAGE,
+    INVOICE_READ,
+    WALLET_READ,
+    WALLET_MANAGE,
+    SUBSCRIPTION_MANAGE;
+
+    public static Permission fromCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Permission code is required");
+        }
+        return Permission.valueOf(code.trim().toUpperCase().replace(':', '_').replace('-', '_'));
+    }
+}

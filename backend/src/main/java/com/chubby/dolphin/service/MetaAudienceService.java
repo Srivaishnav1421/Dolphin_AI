@@ -51,15 +51,7 @@ public class MetaAudienceService {
 
         MetaConnection conn = metaConnRepo.findFirstByAccountIdAndTokenStatus(workspaceId, "VALID").orElse(null);
         if (conn == null || conn.getMetaAdAccountId() == null || conn.getAccessToken() == null) {
-            log.warn("No active Meta connection for workspace {}, creating mock database entry.", workspaceId);
-            MetaAudience localAudience = new MetaAudience();
-            localAudience.setWorkspaceId(workspaceId);
-            localAudience.setName(name);
-            localAudience.setAudienceType("CUSTOM");
-            localAudience.setSubtype("CUSTOMER_FILE");
-            localAudience.setMetaAudienceId("mock-aud-" + UUID.randomUUID());
-            localAudience.setSizeEstimate(0L);
-            return audienceRepo.save(localAudience);
+            throw new IllegalStateException("Active Meta connection is required before creating a custom audience.");
         }
 
         try {
@@ -95,15 +87,7 @@ public class MetaAudienceService {
             return audienceRepo.save(audience);
 
         } catch (Exception e) {
-            log.error("❌ Failed to create Custom Audience on Meta: {}. Saving local fallback entry.", e.getMessage());
-            MetaAudience localAudience = new MetaAudience();
-            localAudience.setWorkspaceId(workspaceId);
-            localAudience.setName(name);
-            localAudience.setAudienceType("CUSTOM");
-            localAudience.setSubtype("CUSTOMER_FILE");
-            localAudience.setMetaAudienceId("local-" + UUID.randomUUID());
-            localAudience.setSizeEstimate(0L);
-            return audienceRepo.save(localAudience);
+            throw new IllegalStateException("Failed to create Custom Audience on Meta: " + e.getMessage(), e);
         }
     }
 
@@ -123,16 +107,12 @@ public class MetaAudienceService {
         MetaConnection conn = metaConnRepo.findFirstByAccountIdAndTokenStatus(workspaceId, "VALID").orElse(null);
         if (conn == null || conn.getAccessToken() == null) {
             log.warn("No active Meta connection to upload users to audience.");
-            audience.setSizeEstimate(audience.getSizeEstimate() + users.size());
-            audienceRepo.save(audience);
-            return true;
+            return false;
         }
 
         if (audience.getMetaAudienceId().startsWith("mock-") || audience.getMetaAudienceId().startsWith("local-")) {
-            log.info("Local/Mock audience detected, skipping Meta Graph API push.");
-            audience.setSizeEstimate(audience.getSizeEstimate() + users.size());
-            audienceRepo.save(audience);
-            return true;
+            log.warn("Local/mock audience id {} cannot be used for production Meta sync.", audience.getMetaAudienceId());
+            return false;
         }
 
         try {
@@ -192,17 +172,7 @@ public class MetaAudienceService {
 
         MetaConnection conn = metaConnRepo.findFirstByAccountIdAndTokenStatus(workspaceId, "VALID").orElse(null);
         if (conn == null || conn.getMetaAdAccountId() == null || conn.getAccessToken() == null) {
-            log.warn("No active Meta connection for lookalike, creating local mock entry.");
-            MetaAudience localAudience = new MetaAudience();
-            localAudience.setWorkspaceId(workspaceId);
-            localAudience.setName(name);
-            localAudience.setAudienceType("LOOKALIKE");
-            localAudience.setSubtype("LOOKALIKE");
-            localAudience.setSourceAudienceId(source.getMetaAudienceId());
-            localAudience.setLookalikeRatio(ratio);
-            localAudience.setLookalikeCountry(country);
-            localAudience.setMetaAudienceId("mock-lla-" + UUID.randomUUID());
-            return audienceRepo.save(localAudience);
+            throw new IllegalStateException("Active Meta connection is required before creating a lookalike audience.");
         }
 
         try {
@@ -245,17 +215,7 @@ public class MetaAudienceService {
             return audienceRepo.save(audience);
 
         } catch (Exception e) {
-            log.error("❌ Failed to create Lookalike Audience on Meta: {}. Saving local fallback entry.", e.getMessage());
-            MetaAudience localAudience = new MetaAudience();
-            localAudience.setWorkspaceId(workspaceId);
-            localAudience.setName(name);
-            localAudience.setAudienceType("LOOKALIKE");
-            localAudience.setSubtype("LOOKALIKE");
-            localAudience.setSourceAudienceId(source.getMetaAudienceId());
-            localAudience.setLookalikeRatio(ratio);
-            localAudience.setLookalikeCountry(country);
-            localAudience.setMetaAudienceId("local-" + UUID.randomUUID());
-            return audienceRepo.save(localAudience);
+            throw new IllegalStateException("Failed to create Lookalike Audience on Meta: " + e.getMessage(), e);
         }
     }
 

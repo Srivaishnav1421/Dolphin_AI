@@ -1,8 +1,11 @@
 package com.chubby.dolphin.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.chubby.dolphin.entity.AiPurpose;
+import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.ai.AiProviderRouterService;
 
 /**
@@ -22,6 +25,7 @@ public class BusinessLlmFacadeService {
 
     private final AiProviderRouterService enterpriseLlmRouter;
     private final BrainFeedbackService brainFeedbackService;
+    private final ObjectProvider<SecurityUtils> securityUtilsProvider;
 
     @Value("${llm.router.temperature:0.3}")
     private double defaultTemperature;
@@ -30,9 +34,11 @@ public class BusinessLlmFacadeService {
     private int defaultMaxTokens;
 
     public BusinessLlmFacadeService(AiProviderRouterService enterpriseLlmRouter, 
-                                    BrainFeedbackService brainFeedbackService) {
+                                    BrainFeedbackService brainFeedbackService,
+                                    ObjectProvider<SecurityUtils> securityUtilsProvider) {
         this.enterpriseLlmRouter = enterpriseLlmRouter;
         this.brainFeedbackService = brainFeedbackService;
+        this.securityUtilsProvider = securityUtilsProvider;
     }
 
     /**
@@ -44,20 +50,30 @@ public class BusinessLlmFacadeService {
     }
 
     public LlmResponse ask(String prompt, double temperature, int maxTokens) {
+        return askForTask(prompt, temperature, maxTokens, AiPurpose.GENERAL_ASSISTANT, "GENERAL_ASSISTANT");
+    }
+
+    public LlmResponse askForTask(String prompt, AiPurpose purpose, String taskKey) {
+        return askForTask(prompt, defaultTemperature, defaultMaxTokens, purpose, taskKey);
+    }
+
+    public LlmResponse askForTask(String prompt, double temperature, int maxTokens, AiPurpose purpose, String taskKey) {
         try {
+            String workspaceId = resolveWorkspaceId();
             com.chubby.dolphin.dto.ai.LlmRequest request = com.chubby.dolphin.dto.ai.LlmRequest.builder()
                     .prompt(prompt)
                     .temperature(temperature)
                     .maxTokens(maxTokens)
-                    .purpose(com.chubby.dolphin.entity.AiPurpose.GENERAL_ASSISTANT)
-                    .workspaceId("default-workspace")
+                    .purpose(purpose != null ? purpose : AiPurpose.GENERAL_ASSISTANT)
+                    .taskKey(taskKey)
+                    .workspaceId(workspaceId)
                     .build();
 
-            com.chubby.dolphin.dto.ai.LlmResponse response = enterpriseLlmRouter.ask("default-workspace", request);
+            com.chubby.dolphin.dto.ai.LlmResponse response = enterpriseLlmRouter.ask(workspaceId, request);
             return new LlmResponse(response.getContent(), response.getProvider(), response.getModel());
         } catch (Exception e) {
             log.error("Enterprise ask delegation failed, emergency fallback: {}", e.getMessage());
-            return new LlmResponse("Analysis unavailable — " + e.getMessage(), "NONE", "none");
+            return new LlmResponse("AI analysis is temporarily unavailable. Continue with the default workflow and retry after checking provider health.", "NONE", "none");
         }
     }
 
@@ -89,7 +105,7 @@ public class BusinessLlmFacadeService {
                 - status: HOT | WARM | COLD | UNQUALIFIABLE
                 - Use "—" for signals not mentioned in the message
                 """.formatted(source, leadMessage);
-        return ask(prompt);
+        return askForTask(prompt, AiPurpose.LEAD_SCORING, "CRM_LEAD_SCORING");
     }
 
     /**
@@ -116,7 +132,7 @@ public class BusinessLlmFacadeService {
                 suggested_budget_change: percentage (-50 to +100)
                 confidence: 0.0-1.0 (how certain the AI is about this recommendation)
                 """.formatted(name, roas, ctr, cpl, spent, budget);
-        return ask(prompt);
+        return askForTask(prompt, AiPurpose.CAMPAIGN_ANALYSIS, "CAMPAIGN_ANALYSIS");
     }
 
     /**
@@ -141,7 +157,7 @@ public class BusinessLlmFacadeService {
                   "reasoning": "Campaign A has 3x better ROAS"
                 }
                 """.formatted(totalBudget, String.join("\n", campaignSummaries));
-        return ask(prompt);
+        return askForTask(prompt, AiPurpose.CAMPAIGN_ANALYSIS, "CAMPAIGN_ANALYSIS");
     }
 
     /**
@@ -154,6 +170,12 @@ public class BusinessLlmFacadeService {
 
     public LlmResponse generateAdCopy(String product, String audience,
                                        String tone, String platform, String languageCode) {
+        return generateAdCopy(product, audience, tone, platform, languageCode, "BALANCED");
+    }
+
+    public LlmResponse generateAdCopy(String product, String audience,
+                                       String tone, String platform, String languageCode,
+                                       String qualityTier) {
         String feedbackContext = brainFeedbackService.getBrainOptimizationContext(product);
 
         String langName = "English";
@@ -178,6 +200,12 @@ public class BusinessLlmFacadeService {
             scriptNote = "Create high-converting copy in Marathi script, with local business-oriented appeal.";
         }
 
+        String qualityInstruction = switch ((qualityTier == null ? "BALANCED" : qualityTier).toUpperCase()) {
+            case "FAST" -> "Prioritize concise usable drafts with clear CTA and minimal rationale.";
+            case "PREMIUM" -> "Create more refined premium copy with sharper hooks, stronger buyer psychology, India-first context, and specific rationale.";
+            default -> "Balance speed and quality with practical copy an Indian business can use immediately.";
+        };
+
         String prompt = """
                 You are an expert Meta Ads copywriter.
                 Generate 3 ad copy variations in the %s language.
@@ -187,6 +215,7 @@ public class BusinessLlmFacadeService {
                 Tone: %s
                 Platform: %s
                 Language/Style instructions: %s
+                Quality level instructions: %s
                 
                 %s
                 
@@ -209,8 +238,8 @@ public class BusinessLlmFacadeService {
                 - INSTAGRAM_FEED: body 2200 chars (but first 125 visible)
                 - INSTAGRAM_STORY: headline 25 chars, body 90 chars
                 - REELS: headline 30 chars, body 72 chars
-                """.formatted(langName, product, audience, tone, platform, scriptNote, feedbackContext);
-        return ask(prompt);
+                """.formatted(langName, product, audience, tone, platform, scriptNote, qualityInstruction, feedbackContext);
+        return askForTask(prompt, AiPurpose.CREATIVE_GENERATION, "CREATIVE_STUDIO");
     }
 
     /**
@@ -219,22 +248,49 @@ public class BusinessLlmFacadeService {
     public java.util.Map<String, Object> getProviderStatus() {
         java.util.Map<com.chubby.dolphin.entity.LlmProvider, com.chubby.dolphin.service.ai.AIService> providerMap = enterpriseLlmRouter.getProviderMap();
 
+        com.chubby.dolphin.service.ai.AIService openai = providerMap.get(com.chubby.dolphin.entity.LlmProvider.OPENAI);
+        com.chubby.dolphin.service.ai.AIService gemini = providerMap.get(com.chubby.dolphin.entity.LlmProvider.GEMINI);
+        com.chubby.dolphin.service.ai.AIService anthropic = providerMap.get(com.chubby.dolphin.entity.LlmProvider.ANTHROPIC);
         com.chubby.dolphin.service.ai.AIService ollama = providerMap.get(com.chubby.dolphin.entity.LlmProvider.OLLAMA);
         com.chubby.dolphin.service.ai.AIService huggingFace = providerMap.get(com.chubby.dolphin.entity.LlmProvider.HUGGINGFACE);
         com.chubby.dolphin.service.ai.AIService mock = providerMap.get(com.chubby.dolphin.entity.LlmProvider.MOCK);
 
+        boolean openaiUp = openai != null && openai.isEnabled() && openai.isAvailable();
+        boolean geminiUp = gemini != null && gemini.isEnabled() && gemini.isAvailable();
+        boolean anthropicUp = anthropic != null && anthropic.isEnabled() && anthropic.isAvailable();
         boolean ollamaUp = ollama != null && ollama.isEnabled() && ollama.isAvailable();
         boolean huggingFaceUp = huggingFace != null && huggingFace.isEnabled() && huggingFace.isAvailable();
         boolean mockUp = mock != null && mock.isEnabled() && mock.isAvailable();
 
         String activeProvider = "MOCK";
-        if (ollamaUp) {
+        if (openaiUp) {
+            activeProvider = "OPENAI";
+        } else if (geminiUp) {
+            activeProvider = "GEMINI";
+        } else if (anthropicUp) {
+            activeProvider = "ANTHROPIC";
+        } else if (ollamaUp) {
             activeProvider = "OLLAMA";
         } else if (huggingFaceUp) {
             activeProvider = "HUGGINGFACE";
         }
 
         return java.util.Map.of(
+            "openai", java.util.Map.of(
+                "enabled", openai != null && openai.isEnabled(),
+                "available", openaiUp,
+                "model", openai != null ? openai.getModelName() : "gpt-4.1-mini"
+            ),
+            "gemini", java.util.Map.of(
+                "enabled", gemini != null && gemini.isEnabled(),
+                "available", geminiUp,
+                "model", gemini != null ? gemini.getModelName() : "gemini-1.5-flash"
+            ),
+            "anthropic", java.util.Map.of(
+                "enabled", anthropic != null && anthropic.isEnabled(),
+                "available", anthropicUp,
+                "model", anthropic != null ? anthropic.getModelName() : "claude-3-5-sonnet-latest"
+            ),
             "ollama", java.util.Map.of(
                 "enabled", ollama != null && ollama.isEnabled(),
                 "available", ollamaUp,
@@ -263,5 +319,20 @@ public class BusinessLlmFacadeService {
         public boolean isAvailable() {
             return !"NONE".equals(provider);
         }
+    }
+
+    private String resolveWorkspaceId() {
+        try {
+            SecurityUtils securityUtils = securityUtilsProvider.getIfAvailable();
+            if (securityUtils != null) {
+                String workspaceId = securityUtils.currentWorkspaceId();
+                if (workspaceId != null && !workspaceId.isBlank()) {
+                    return workspaceId;
+                }
+            }
+        } catch (Exception ignored) {
+            // Background jobs and tests may run without a request security context.
+        }
+        return "system-workspace";
     }
 }

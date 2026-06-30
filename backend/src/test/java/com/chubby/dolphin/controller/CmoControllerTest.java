@@ -24,6 +24,8 @@ public class CmoControllerTest {
     @Mock private CmoMemoryService cmoMemoryService;
     @Mock private BrainGovernanceService governanceService;
     @Mock private com.chubby.dolphin.security.SecurityUtils securityUtils;
+    @Mock private com.chubby.dolphin.security.TenantAccessService tenantAccessService;
+    @Mock private com.chubby.dolphin.security.AccessControlService access;
 
     private CmoController controller;
 
@@ -38,7 +40,9 @@ public class CmoControllerTest {
                 competitorMonitoringService,
                 cmoMemoryService,
                 governanceService,
-                securityUtils
+                securityUtils,
+                tenantAccessService,
+                access
         );
     }
 

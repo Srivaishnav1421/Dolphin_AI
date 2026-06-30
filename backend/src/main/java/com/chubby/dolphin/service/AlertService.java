@@ -26,6 +26,7 @@ public class AlertService {
     @Value("${alerts.enabled:false}")         private boolean alertsEnabled;
     @Value("${alerts.email:admin@dolphin.ai}") private String  alertEmail;
     @Value("${alerts.roas.threshold:1.5}")    private double  roasThreshold;
+    @Value("${app.frontend-url:http://localhost:4200}") private String frontendUrl;
 
     @Async
     public void notifyHotLead(String accountId, String leadName, double score) {
@@ -39,12 +40,12 @@ public class AlertService {
               <p><strong>Name:</strong> %s</p>
               <p><strong>AI Score:</strong> <span style="color:#ef4444">%.2f / 1.0</span></p>
               <br/>
-              <a href="http://localhost:4200/leads"
+              <a href="%s"
                  style="background:#00d4ff;color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700">
                 View Lead →
               </a>
             </div>
-            """.formatted(leadName, score)
+            """.formatted(leadName, score, appLink("/leads"))
         );
     }
 
@@ -59,12 +60,12 @@ public class AlertService {
               <h2 style="color:#f59e0b">⚠️ Campaign ROAS Below Threshold</h2>
               <p><strong>Campaign:</strong> %s</p>
               <p><strong>ROAS:</strong> <span style="color:#ef4444">%.2fx</span> (threshold: %.1fx)</p>
-              <a href="http://localhost:4200/campaigns"
+              <a href="%s"
                  style="background:#f59e0b;color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700">
                 Review →
               </a>
             </div>
-            """.formatted(campaignName, roas, roasThreshold)
+            """.formatted(campaignName, roas, roasThreshold, appLink("/campaigns"))
         );
     }
 
@@ -79,12 +80,12 @@ public class AlertService {
               <h2 style="color:#f59e0b">⏸ Brain Auto-Paused a Campaign</h2>
               <p><strong>Campaign:</strong> %s</p>
               <p><strong>Reason:</strong> %s</p>
-              <a href="http://localhost:4200/campaigns"
+              <a href="%s"
                  style="background:#6366f1;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700">
                 View →
               </a>
             </div>
-            """.formatted(campaignName, reason)
+            """.formatted(campaignName, reason, appLink("/campaigns"))
         );
     }
 
@@ -98,12 +99,12 @@ public class AlertService {
             <div style="font-family:sans-serif;padding:24px;background:#0d1b2a;color:#f1f5f9">
               <h2 style="color:#ef4444">💸 Wallet Balance is Low</h2>
               <p>Balance: <strong style="color:#ef4444">₹%.0f</strong></p>
-              <a href="http://localhost:4200/wallet"
+              <a href="%s"
                  style="background:#00d4ff;color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700">
                 Add Funds →
               </a>
             </div>
-            """.formatted(balance)
+            """.formatted(balance, appLink("/settings"))
         );
     }
 
@@ -122,14 +123,14 @@ public class AlertService {
                   <p>Reporting Period: <strong>%s to %s</strong></p>
                   <p>Your autonomous AI marketing report has been generated. Download it from the dashboard.</p>
                   <br/>
-                  <a href="http://localhost:4200/analytics"
+                  <a href="%s"
                      style="background:#00d4ff;color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700">
                     View Dashboard →
                   </a>
                   <br/><br/>
                   <p style="color:#64748b;font-size:12px">This report was generated autonomously by the DolphinAI Brain.</p>
                 </div>
-                """.formatted(reportTitle, from, to), true);
+                """.formatted(reportTitle, from, to, appLink("/analytics")), true);
             helper.setFrom("noreply@dolphin.ai");
             mailSender.send(msg);
             log.info("📧 Report notification sent to: {}", toEmail);
@@ -157,5 +158,13 @@ public class AlertService {
         } catch (MessagingException e) {
             log.error("Failed to send alert email: {}", e.getMessage());
         }
+    }
+
+    private String appLink(String path) {
+        String base = frontendUrl == null || frontendUrl.isBlank() ? "http://localhost:4200" : frontendUrl.trim();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return path.startsWith("/") ? base + path : base + "/" + path;
     }
 }

@@ -28,12 +28,14 @@ public class FinancialEvent {
     @Column(nullable = false)
     private double amount;
 
+    @Builder.Default
     @Column(nullable = false)
     private String currency = "INR";
 
     @Column(name = "reference_id", nullable = false)
     private String referenceId;
 
+    @Builder.Default
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

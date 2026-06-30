@@ -4,25 +4,27 @@ import { Router } from '@angular/router';
 import { tap, catchError } from 'rxjs/operators';
 import { Observable, throwError } from 'rxjs';
 import { AuthResponse, User } from '../../shared/models';
+import { RuntimeConfigService } from './runtime-config.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly TOKEN_KEY   = 'cd_token';
   private readonly REFRESH_KEY = 'cd_refresh';
   private readonly USER_KEY    = 'cd_user';
-  private readonly BASE        = 'http://localhost:8000';
+  private readonly BASE: string;
 
-  currentUser     = signal<User | null>(this.loadUser());
-  isAuthenticated = signal<boolean>(!!localStorage.getItem(this.TOKEN_KEY));
+  currentUser     = signal<User | null>(null);
+  isAuthenticated = signal<boolean>(false);
 
-  constructor(private http: HttpClient, private router: Router) {
+  constructor(private http: HttpClient, private router: Router, config: RuntimeConfigService) {
+    this.BASE = config.apiBase;
     // On startup, check if token needs refresh
     this.checkTokenExpiry();
   }
 
   /** Login — stores access token (15min) + refresh token (7 days) */
-  login(email: string, password: string) {
-    return this.http.post<AuthResponse>(`${this.BASE}/api/auth/login`, { email, password }).pipe(
+  login(email: string, password: string, totpCode?: string) {
+    return this.http.post<AuthResponse>(`${this.BASE}/api/auth/login`, { email, password, totpCode }).pipe(
       tap(res => this.storeAuth(res)),
     );
   }
@@ -69,6 +71,32 @@ export class AuthService {
     return localStorage.getItem(this.REFRESH_KEY);
   }
 
+  hasStoredToken(): boolean {
+    return !!this.getToken();
+  }
+
+  /**
+   * Enterprise route validation: localStorage is not authority.
+   * The backend must confirm the token and database-backed user context.
+   */
+  validateSession(): Observable<User> {
+    return this.http.get<User>(`${this.BASE}/api/auth/me`).pipe(
+      tap(user => {
+        localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+        this.currentUser.set(user);
+        this.isAuthenticated.set(true);
+      }),
+      catchError(err => {
+        this.clearAuth(false);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  clearLocalSession(redirect = true) {
+    this.clearAuth(redirect);
+  }
+
   /** Check if stored token is near expiry and refresh proactively */
   private checkTokenExpiry() {
     const token = this.getToken();
@@ -100,19 +128,15 @@ export class AuthService {
     this.isAuthenticated.set(true);
   }
 
-  private clearAuth() {
+  private clearAuth(redirect = true) {
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_KEY);
     localStorage.removeItem(this.USER_KEY);
     this.currentUser.set(null);
     this.isAuthenticated.set(false);
-    this.router.navigate(['/login']);
+    if (redirect) {
+      this.router.navigate(['/login']);
+    }
   }
 
-  private loadUser(): User | null {
-    try {
-      const raw = localStorage.getItem(this.USER_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  }
 }

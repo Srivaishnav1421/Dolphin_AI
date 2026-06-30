@@ -1,24 +1,38 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { RuntimeConfigService } from './runtime-config.service';
+import { AuthService } from './auth.service';
 import {
   Campaign, Lead, WalletStatus, EmasMetrics,
   BrainEvent, DashboardSummary, ArbitrageResult,
   MetaConnection, BrainDecision, AdCreative, LlmProviderStatus,
-  MarketingForm, LandingPage, FormSubmission,
+  MarketingForm, LandingPage, FormSubmission, ApprovalItem,
+  AdBrainRunResult, AdBrainSignal, CampaignMathEvaluation,
+  ContentFactoryItem, AnalyticsSummary,
 } from '../../shared/models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private base = 'http://localhost:8000';
+  private base: string;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, config: RuntimeConfigService, private auth: AuthService) {
+    this.base = config.apiBase;
+  }
 
   // ══════════════════════════════════════════════════════════════════
   //  Dashboard
   // ══════════════════════════════════════════════════════════════════
   getDashboard(): Observable<DashboardSummary> {
     return this.http.get<DashboardSummary>(`${this.base}/api/dashboard/summary`);
+  }
+
+  getRuntimeIdentity(): Observable<any> {
+    return this.http.get<any>(`${this.base}/api/system/runtime`);
+  }
+
+  getAnalyticsSummary(): Observable<AnalyticsSummary> {
+    return this.http.get<AnalyticsSummary>(`${this.base}/api/analytics/summary`);
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -37,7 +51,10 @@ export class ApiService {
     return this.http.delete<void>(`${this.base}/api/campaigns/${id}`);
   }
   evaluateCampaign(id: string): Observable<any> {
-    return this.http.post(`${this.base}/api/campaigns/${id}/evaluate`, {});
+    return this.http.post(`${this.base}/api/math-engine/campaigns/${id}/evaluate`, {});
+  }
+  getCampaignMathScore(id: string): Observable<CampaignMathEvaluation> {
+    return this.http.get<CampaignMathEvaluation>(`${this.base}/api/campaigns/${id}/math-score`);
   }
   pauseCampaign(id: string): Observable<Campaign> {
     return this.http.post<Campaign>(`${this.base}/api/campaigns/${id}/pause`, {});
@@ -104,6 +121,19 @@ export class ApiService {
   generateInvoice(amount: number, transaction_id: string): Observable<any> {
     return this.http.post<any>(`${this.base}/api/invoices/generate`, { amount, transaction_id });
   }
+  createPaymentOrder(amount: number): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/payment/order`, { amount });
+  }
+  getPaymentConfig(): Observable<any> {
+    return this.http.get<any>(`${this.base}/api/payment/config`);
+  }
+  verifyPayment(body: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/payment/verify`, body);
+  }
 
   // ══════════════════════════════════════════════════════════════════
   //  Leads
@@ -116,11 +146,38 @@ export class ApiService {
   scoreLead(body: { name: string; message: string; source: string }): Observable<Lead> {
     return this.http.post<Lead>(`${this.base}/api/leads/score`, body);
   }
+  createLead(body: Partial<Lead> & Record<string, unknown>): Observable<Lead> {
+    return this.http.post<Lead>(`${this.base}/api/leads`, body);
+  }
+  getLead(id: string): Observable<Lead> {
+    return this.http.get<Lead>(`${this.base}/api/leads/${id}`);
+  }
+  scoreExistingLead(id: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/leads/${id}/score`, {});
+  }
+  recommendLeadNextAction(id: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/leads/${id}/recommend-next-action`, {});
+  }
+  submitLeadFollowupApproval(id: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/leads/${id}/submit-followup-approval`, {});
+  }
+  updateLeadStatus(id: string, body: { status?: string; pipeline_stage?: string }): Observable<Lead> {
+    return this.http.patch<Lead>(`${this.base}/api/leads/${id}/status`, body);
+  }
+  deleteLead(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/api/leads/${id}`);
+  }
   getLeadChatHistory(leadId: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.base}/api/leads/${leadId}/chat`);
   }
   sendLeadChatMessage(leadId: string, message: string): Observable<any> {
     return this.http.post<any>(`${this.base}/api/leads/${leadId}/chat`, { message });
+  }
+  getLeadInteractions(leadId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/api/leads/${leadId}/interactions`);
+  }
+  addLeadInteraction(leadId: string, body: { type: string; channel: string; notes: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/leads/${leadId}/interactions`, body);
   }
   updateLead(id: string, body: any): Observable<Lead> {
     return this.http.put<Lead>(`${this.base}/api/leads/${id}`, body);
@@ -188,8 +245,56 @@ export class ApiService {
     return this.http.post<any>(`${this.base}/api/brain/recommendations/${id}/reject`, {});
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  Global Approval Queue
+  // ══════════════════════════════════════════════════════════════════
+  getApprovals(): Observable<ApprovalItem[]> {
+    return this.http.get<ApprovalItem[]>(`${this.base}/api/approvals`);
+  }
+  getPendingApprovals(): Observable<ApprovalItem[]> {
+    return this.http.get<ApprovalItem[]>(`${this.base}/api/approvals/pending`);
+  }
+  createApprovalItem(body: Partial<ApprovalItem> & Record<string, unknown>): Observable<ApprovalItem> {
+    return this.http.post<ApprovalItem>(`${this.base}/api/approvals`, body);
+  }
+  approveApprovalItem(id: string): Observable<ApprovalItem> {
+    return this.http.post<ApprovalItem>(`${this.base}/api/approvals/${id}/approve`, {});
+  }
+  rejectApprovalItem(id: string, reason = 'Rejected from Growth Home'): Observable<ApprovalItem> {
+    return this.http.post<ApprovalItem>(`${this.base}/api/approvals/${id}/reject`, { reason });
+  }
+  executeApprovalItem(id: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/approvals/${id}/execute`, {});
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  Ad Brain Manual Run
+  // ══════════════════════════════════════════════════════════════════
+  runAdBrain(): Observable<AdBrainRunResult> {
+    return this.http.post<AdBrainRunResult>(`${this.base}/api/ad-brain/run`, {});
+  }
+  getAdBrainStatus(): Observable<AdBrainRunResult | null> {
+    return this.http.get<AdBrainRunResult | null>(`${this.base}/api/ad-brain/status`);
+  }
+  getAdBrainRuns(): Observable<AdBrainRunResult[]> {
+    return this.http.get<AdBrainRunResult[]>(`${this.base}/api/ad-brain/runs`);
+  }
+  getAdBrainRun(id: string): Observable<AdBrainRunResult> {
+    return this.http.get<AdBrainRunResult>(`${this.base}/api/ad-brain/runs/${id}`);
+  }
+  getLatestAdBrainSignals(): Observable<AdBrainSignal[]> {
+    return this.http.get<AdBrainSignal[]>(`${this.base}/api/ad-brain/signals/latest`);
+  }
+  getAdBrainEvaluations(runId?: string): Observable<CampaignMathEvaluation[]> {
+    const params = runId ? new HttpParams().set('runId', runId) : undefined;
+    return this.http.get<CampaignMathEvaluation[]>(`${this.base}/api/ad-brain/evaluations`, { params });
+  }
+  getAdBrainEvaluation(id: string): Observable<CampaignMathEvaluation> {
+    return this.http.get<CampaignMathEvaluation>(`${this.base}/api/ad-brain/evaluations/${id}`);
+  }
+
   getBrainAnalytics(workspaceId?: string): Observable<any> {
-    const ws = workspaceId || 'default-workspace';
+    const ws = this.workspaceId(workspaceId);
     return this.http.get<any>(`${this.base}/api/brain/analytics?workspaceId=${ws}`);
   }
 
@@ -218,19 +323,19 @@ export class ApiService {
   //  AI Chief Marketing Officer (CMO) Dashboard API
   // ══════════════════════════════════════════════════════════════════
   getCmoDashboard(workspaceId?: string): Observable<any> {
-    const ws = workspaceId || 'default-workspace';
+    const ws = this.workspaceId(workspaceId);
     return this.http.get<any>(`${this.base}/api/cmo/dashboard?workspaceId=${ws}`);
   }
   getCmoForecast(workspaceId?: string): Observable<any> {
-    const ws = workspaceId || 'default-workspace';
+    const ws = this.workspaceId(workspaceId);
     return this.http.get<any>(`${this.base}/api/cmo/forecast?workspaceId=${ws}`);
   }
   getCmoStrategy(workspaceId?: string): Observable<any> {
-    const ws = workspaceId || 'default-workspace';
+    const ws = this.workspaceId(workspaceId);
     return this.http.get<any>(`${this.base}/api/cmo/strategy?workspaceId=${ws}`);
   }
   getCmoCompetitors(workspaceId?: string): Observable<any> {
-    const ws = workspaceId || 'default-workspace';
+    const ws = this.workspaceId(workspaceId);
     return this.http.get<any>(`${this.base}/api/cmo/competitors?workspaceId=${ws}`);
   }
   activateExperiment(id: string): Observable<any> {
@@ -252,6 +357,9 @@ export class ApiService {
   getMetaStatus(): Observable<any> {
     return this.http.get(`${this.base}/api/meta/status`);
   }
+  getIntegrationStatus(): Observable<Record<string, any>> {
+    return this.http.get<Record<string, any>>(`${this.base}/api/integrations/status`);
+  }
   syncMeta(): Observable<any> {
     return this.http.post(`${this.base}/api/meta/sync`, {});
   }
@@ -267,7 +375,7 @@ export class ApiService {
     if (status) params = params.set('status', status);
     return this.http.get<AdCreative[]>(`${this.base}/api/creatives`, { params });
   }
-  generateCreative(body: { product: string; audience: string; tone: string; platform: string; campaign_id?: string }): Observable<any> {
+  generateCreative(body: { product: string; audience: string; tone: string; platform: string; campaign_id?: string; quality_tier?: string; language_code?: string }): Observable<any> {
     return this.http.post(`${this.base}/api/creatives/generate`, body);
   }
   suggestABTests(campaignId: string): Observable<any> {
@@ -284,6 +392,34 @@ export class ApiService {
   }
 
   // ══════════════════════════════════════════════════════════════════
+  //  Content Factory
+  // ══════════════════════════════════════════════════════════════════
+  generateContentFactory(body: {
+    business_name: string;
+    product_service: string;
+    target_audience: string;
+    location?: string;
+    offer?: string;
+    tone: string;
+    language: string;
+    channel: string;
+    goal: string;
+    cta_style: string;
+    content_type: string;
+  }): Observable<ContentFactoryItem> {
+    return this.http.post<ContentFactoryItem>(`${this.base}/api/content-factory/generate`, body);
+  }
+  getContentFactoryItems(): Observable<ContentFactoryItem[]> {
+    return this.http.get<ContentFactoryItem[]>(`${this.base}/api/content-factory/items`);
+  }
+  getContentFactoryItem(id: string): Observable<ContentFactoryItem> {
+    return this.http.get<ContentFactoryItem>(`${this.base}/api/content-factory/items/${id}`);
+  }
+  submitContentFactoryVariantApproval(id: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/content-factory/variants/${id}/submit-approval`, {});
+  }
+
+  // ══════════════════════════════════════════════════════════════════
   //  Workspace Config
   // ══════════════════════════════════════════════════════════════════
   getWorkspaceConfig(): Observable<any> {
@@ -291,6 +427,12 @@ export class ApiService {
   }
   updateWorkspaceConfig(body: any): Observable<any> {
     return this.http.put<any>(`${this.base}/api/workspace/config`, body);
+  }
+  getWorkspaceTeam(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/api/workspace/team`);
+  }
+  updateWorkspaceTeamRole(userId: string, role: string): Observable<any> {
+    return this.http.put<any>(`${this.base}/api/workspace/team/${userId}/role`, { role });
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -314,19 +456,28 @@ export class ApiService {
   //  AI Provider Layer
   // ══════════════════════════════════════════════════════════════════
   getAiProviders(): Observable<any> {
-    return this.http.get<any>(`${this.base}/api/brain/llm/providers`);
+    return this.http.get<any>(`${this.base}/api/admin/ai-infrastructure/providers`);
   }
   switchAiProvider(provider: string): Observable<any> {
-    return this.http.post<any>(`${this.base}/api/brain/llm/switch`, { provider });
+    return this.http.post<any>(`${this.base}/api/admin/ai-infrastructure/switch`, { provider });
   }
   getAiUsageStats(): Observable<any> {
-    return this.http.get<any>(`${this.base}/api/brain/llm/usage-stats`);
+    return this.http.get<any>(`${this.base}/api/admin/ai-infrastructure/usage-stats`);
   }
   getAiBudget(): Observable<any> {
-    return this.http.get<any>(`${this.base}/api/brain/llm/budgets`);
+    return this.http.get<any>(`${this.base}/api/admin/ai-infrastructure/budgets`);
   }
   updateAiBudget(body: any): Observable<any> {
-    return this.http.post<any>(`${this.base}/api/brain/llm/budgets`, body);
+    return this.http.post<any>(`${this.base}/api/admin/ai-infrastructure/budgets`, body);
+  }
+  getAiRouting(): Observable<any> {
+    return this.http.get<any>(`${this.base}/api/admin/ai-infrastructure/routing`);
+  }
+  updateDefaultAiProvider(provider: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/admin/ai-infrastructure/routing/default`, { provider });
+  }
+  updateAiTaskRoute(taskKey: string, provider: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/api/admin/ai-infrastructure/routing/tasks/${taskKey}`, { provider });
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -348,6 +499,14 @@ export class ApiService {
     let params: any = {};
     if (workspaceId) { params['workspaceId'] = workspaceId; }
     return this.http.get<any>(`${this.base}/api/growth/executive-summary`, { params });
+  }
+
+  private workspaceId(workspaceId?: string): string {
+    const resolved = workspaceId || this.auth.currentUser()?.account_id;
+    if (!resolved) {
+      throw new Error('Workspace context is missing. Please sign in again.');
+    }
+    return resolved;
   }
 
   // ══════════════════════════════════════════════════════════════════

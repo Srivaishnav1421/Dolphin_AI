@@ -3,7 +3,7 @@ import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WebsocketService } from '../../core/services/websocket.service';
-import { BrainEvent, BrainDecision, ArbitrageResult, LlmProviderStatus } from '../../shared/models';
+import { ApprovalItem, BrainEvent, BrainDecision, ArbitrageResult, LlmProviderStatus } from '../../shared/models';
 import { Subscription } from 'rxjs';
 
 import { FormsModule } from '@angular/forms';
@@ -31,7 +31,8 @@ export class AdBrain implements OnInit, OnDestroy {
   opportunities = signal<BrainDecision[]>([]);
   risks         = signal<BrainDecision[]>([]);
   history       = signal<BrainDecision[]>([]);
-  approvals     = signal<BrainDecision[]>([]);
+  approvals     = signal<ApprovalItem[]>([]);
+  approvalsError = signal<string | null>(null);
 
   experimentsList = signal<any[]>([]);
   recommendations = signal<BrainDecision[]>([]);
@@ -54,7 +55,7 @@ export class AdBrain implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    this.accountId = this.auth.currentUser()?.account_id ?? 'demo-001';
+    this.accountId = this.auth.currentUser()?.account_id ?? '';
     this.load();
 
     const token = this.auth.getToken();
@@ -115,10 +116,19 @@ export class AdBrain implements OnInit, OnDestroy {
           d.status === 'PENDING_APPROVAL'
         ));
 
-        this.approvals.set(r.filter(d => d.status === 'PENDING_APPROVAL'));
         this.history.set(r.filter(d => d.status !== 'PENDING_APPROVAL'));
       },
       error: () => {},
+    });
+    this.api.getPendingApprovals().subscribe({
+      next: approvals => {
+        this.approvalsError.set(null);
+        this.approvals.set(approvals ?? []);
+      },
+      error: () => {
+        this.approvals.set([]);
+        this.approvalsError.set('Could not load the global approval queue.');
+      }
     });
     this.api.getLlmStatus().subscribe({
       next: s => this.llmStatus.set(s),
@@ -128,10 +138,14 @@ export class AdBrain implements OnInit, OnDestroy {
       next: exp => this.experimentsList.set(exp),
       error: () => {},
     });
-    this.api.getBrainAnalytics(this.accountId).subscribe({
-      next: a => this.analytics.set(a),
-      error: () => {},
-    });
+    if (this.accountId) {
+      this.api.getBrainAnalytics(this.accountId).subscribe({
+        next: a => this.analytics.set(a),
+        error: () => {},
+      });
+    } else {
+      this.analytics.set(null);
+    }
     this.loadInsights();
   }
 
@@ -180,6 +194,10 @@ export class AdBrain implements OnInit, OnDestroy {
   }
 
   runArbitrage() {
+    if (!this.accountId) {
+      alert('Workspace context is missing. Please sign in again before running budget analysis.');
+      return;
+    }
     this.running.set(true);
     this.api.runArbitrage(this.accountId).subscribe({
       next: res => { this.arbitrage.set(res); this.running.set(false); },
@@ -188,11 +206,11 @@ export class AdBrain implements OnInit, OnDestroy {
   }
 
   approveDecision(id: string) {
-    this.api.approveRecommendation(id).subscribe(() => this.load());
+    this.api.approveApprovalItem(id).subscribe(() => this.load());
   }
 
   rejectDecision(id: string) {
-    this.api.rejectRecommendation(id).subscribe(() => this.load());
+    this.api.rejectApprovalItem(id, 'Rejected from AI Insights').subscribe(() => this.load());
   }
 
 
@@ -238,7 +256,7 @@ export class AdBrain implements OnInit, OnDestroy {
       'Indian startup sees 4.2x ROAS lift using autonomous ad pilot.',
       'Integrate WhatsApp automated sequences with your Meta Leads.'
     ];
-    const ctas = ['LEARN_MORE', 'SIGN_UP', 'BOOK_TRAVEL'];
+    const ctas = ['LEARN_MORE', 'SIGN_UP', 'BOOK_NOW'];
 
     this.api.createAbExperiment(campaignId, headlines, bodies, ctas).subscribe({
       next: () => {

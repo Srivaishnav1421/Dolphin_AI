@@ -1,6 +1,9 @@
 package com.chubby.dolphin.controller;
 
 import com.chubby.dolphin.entity.AdCreative;
+import com.chubby.dolphin.repository.CampaignRepository;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.AdvantageIntelligenceService;
 import lombok.extern.slf4j.Slf4j;
@@ -21,11 +24,17 @@ public class AdvantageIntelligenceController {
 
     private final AdvantageIntelligenceService intelligenceService;
     private final SecurityUtils sec;
+    private final CampaignRepository campaignRepo;
+    private final AccessControlService access;
 
     public AdvantageIntelligenceController(AdvantageIntelligenceService intelligenceService,
-                                            SecurityUtils sec) {
+                                            SecurityUtils sec,
+                                            CampaignRepository campaignRepo,
+                                            AccessControlService access) {
         this.intelligenceService = intelligenceService;
         this.sec = sec;
+        this.campaignRepo = campaignRepo;
+        this.access = access;
     }
 
     /**
@@ -35,6 +44,7 @@ public class AdvantageIntelligenceController {
     @PostMapping("/generate-matrix")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<List<AdCreative>> generateTestingGrid(@RequestBody Map<String, String> body) {
+        access.requireWorkspacePermission(Permission.CREATIVE_GENERATE);
         String campaignId = body.get("campaign_id");
         String productDesc = body.get("product_description");
         String targetAudience = body.get("target_audience");
@@ -43,9 +53,13 @@ public class AdvantageIntelligenceController {
                 campaignId.isBlank() || productDesc.isBlank() || targetAudience.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
+        String workspaceId = sec.currentWorkspaceId();
+        if (campaignRepo.findByIdAndWorkspaceId(campaignId, workspaceId).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
 
         List<AdCreative> grid = intelligenceService.generateMultiVariateGrid(
-                sec.currentAccountId(), campaignId, productDesc, targetAudience
+                workspaceId, campaignId, productDesc, targetAudience
         );
 
         return ResponseEntity.ok(grid);

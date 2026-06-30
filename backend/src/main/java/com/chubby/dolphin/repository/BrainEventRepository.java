@@ -8,6 +8,7 @@ public interface BrainEventRepository extends JpaRepository<BrainEvent, String> 
     List<BrainEvent> findTop50ByWorkspaceIdOrderByCreatedAtDesc(String workspaceId);
     List<BrainEvent> findByWorkspaceIdOrderByCreatedAtDesc(String workspaceId);
     List<BrainEvent> findTop50ByOrderByCreatedAtDesc();
+    long countByWorkspaceIdIn(List<String> workspaceIds);
 
     default List<BrainEvent> findTop50ByAccountIdOrderByCreatedAtDesc(String accountId) {
         return findTop50ByWorkspaceIdOrderByCreatedAtDesc(accountId);

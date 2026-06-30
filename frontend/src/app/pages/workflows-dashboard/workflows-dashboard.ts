@@ -42,6 +42,10 @@ export class WorkflowsDashboard implements OnInit, OnDestroy {
   // Custom execution trigger
   customMessage = signal('');
   submittingWorkflow = signal(false);
+  localModeEnabled = signal(true);
+  runtimeUnavailable = signal(false);
+  workflowError = signal('');
+  workflowNotice = signal('');
 
   // Approval response
   approvalReason = '';
@@ -51,6 +55,7 @@ export class WorkflowsDashboard implements OnInit, OnDestroy {
   constructor(private api: ApiService, private ws: WebsocketService) {}
 
   ngOnInit() {
+    this.loadRuntime();
     this.loadAll();
     this.ws.connected$.subscribe(connected => {
       if (connected) {
@@ -71,6 +76,7 @@ export class WorkflowsDashboard implements OnInit, OnDestroy {
 
   loadAll() {
     this.loading.set(true);
+    this.workflowError.set('');
     this.api.getWorkflowExecutions().subscribe({
       next: (data) => {
         this.executions.set(data.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
@@ -96,19 +102,45 @@ export class WorkflowsDashboard implements OnInit, OnDestroy {
         
         this.loading.set(false);
       },
-      error: () => this.loading.set(false)
+      error: () => {
+        this.executions.set([]);
+        this.workflowError.set('Automation activity could not be loaded from the database. Retry when the backend is reachable.');
+        this.loading.set(false);
+      }
     });
 
-    this.api.getWorkflowStats().subscribe(data => {
-      if (data) this.stats.set(data);
+    this.api.getWorkflowStats().subscribe({
+      next: (data) => {
+        if (data) this.stats.set(data);
+      },
+      error: () => this.workflowError.set('Automation summary could not be loaded from the database.')
     });
 
-    this.api.getWorkflowTemplates().subscribe(data => {
-      if (data) this.templates.set(data);
+    this.api.getWorkflowTemplates().subscribe({
+      next: (data) => {
+        if (data) this.templates.set(data);
+      },
+      error: () => this.workflowError.set('Automation templates could not be loaded from the database.')
     });
 
-    this.api.getWorkflowApprovals().subscribe(data => {
-      if (data) this.approvals.set(data);
+    this.api.getWorkflowApprovals().subscribe({
+      next: (data) => {
+        if (data) this.approvals.set(data);
+      },
+      error: () => this.workflowError.set('Automation approvals could not be loaded from the database.')
+    });
+  }
+
+  loadRuntime() {
+    this.runtimeUnavailable.set(false);
+    this.api.getRuntimeIdentity().subscribe({
+      next: (runtime) => {
+        this.localModeEnabled.set(runtime?.localModeEnabled ?? runtime?.local_mode_enabled ?? true);
+      },
+      error: () => {
+        this.runtimeUnavailable.set(true);
+        this.localModeEnabled.set(true);
+      }
     });
   }
 
@@ -165,14 +197,22 @@ export class WorkflowsDashboard implements OnInit, OnDestroy {
 
   triggerCustomWorkflow() {
     if (!this.customMessage().trim()) return;
+    if (this.localModeEnabled()) {
+      this.workflowNotice.set('Manual automation execution is disabled in local approval-first mode. No workflow was started.');
+      return;
+    }
     this.submittingWorkflow.set(true);
+    this.workflowNotice.set('');
     this.api.executeWorkflow(this.customMessage()).subscribe({
       next: (exec) => {
         this.customMessage.set('');
         this.submittingWorkflow.set(false);
         this.loadAll();
       },
-      error: () => this.submittingWorkflow.set(false)
+      error: (err) => {
+        this.workflowNotice.set(err?.error?.message || 'Automation execution was not started.');
+        this.submittingWorkflow.set(false);
+      }
     });
   }
 

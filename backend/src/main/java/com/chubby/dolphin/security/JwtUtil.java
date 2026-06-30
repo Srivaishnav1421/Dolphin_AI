@@ -26,10 +26,16 @@ public class JwtUtil {
     }
 
     public String generateToken(String email, String role, String workspaceId) {
+        return generateToken(email, role, workspaceId, null, null);
+    }
+
+    public String generateToken(String email, String role, String workspaceId, String organizationId, String userId) {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
                 .claim("workspaceId", workspaceId)
+                .claim("organizationId", organizationId)
+                .claim("userId", userId)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getKey(), SignatureAlgorithm.HS256)
@@ -42,6 +48,14 @@ public class JwtUtil {
 
     public String extractWorkspaceId(String token) {
         return getClaims(token).get("workspaceId", String.class);
+    }
+
+    public String extractOrganizationId(String token) {
+        return getClaims(token).get("organizationId", String.class);
+    }
+
+    public String extractUserId(String token) {
+        return getClaims(token).get("userId", String.class);
     }
 
     public boolean isValid(String token) {

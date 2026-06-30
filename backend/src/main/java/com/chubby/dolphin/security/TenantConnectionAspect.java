@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Session;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.sql.DatabaseMetaData;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 
 /**
  * Tenant Connection Aspect — Aspect-oriented binding to inject the active
@@ -60,9 +62,14 @@ public class TenantConnectionAspect {
         String tenantId = TenantContext.getCurrentTenant();
         if (tenantId != null && !tenantId.isBlank()) {
             try {
-                entityManager.createNativeQuery("SET LOCAL app.workspace_id = :tenantId")
-                        .setParameter("tenantId", tenantId)
-                        .executeUpdate();
+                entityManager.unwrap(Session.class).doWork(connection -> {
+                    try (PreparedStatement statement = connection.prepareStatement(
+                            "SELECT set_config('app.workspace_id', ?, true)"
+                    )) {
+                        statement.setString(1, tenantId);
+                        statement.execute();
+                    }
+                });
                 log.debug("🔑 Bound app.workspace_id = {} to PostgreSQL transaction context.", tenantId);
             } catch (Exception e) {
                 log.warn("Failed to bind workspace RLS parameter: {}", e.getMessage());

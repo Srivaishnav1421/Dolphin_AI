@@ -13,6 +13,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.File;
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -24,19 +25,26 @@ public class GstInvoiceServiceTest {
     @Mock private InvoiceRepository invoiceRepo;
     @Mock private InvoiceSequenceRepository sequenceRepo;
     @Mock private WorkspaceConfigRepository configRepo;
+    @Mock private FileStorageService fileStorageService;
 
     private GstInvoiceService service;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new GstInvoiceService(invoiceRepo, sequenceRepo, configRepo);
-        
+        // Pass FileStorageService as 4th constructor argument (DA-052)
+        service = new GstInvoiceService(invoiceRepo, sequenceRepo, configRepo, fileStorageService);
+
         // Inject corporate properties using ReflectionTestUtils to match production values
         ReflectionTestUtils.setField(service, "corporateStateCode", "MH");
         ReflectionTestUtils.setField(service, "corporateLegalName", "DolphinAI Private Limited");
         ReflectionTestUtils.setField(service, "corporateGstin", "27AAACC4111D1Z5");
         ReflectionTestUtils.setField(service, "corporateAddress", "102 Alpha Towers, Mumbai, MH");
+        ReflectionTestUtils.setField(service, "sacCode", "997331");
+
+        // Mock storage so PDF generation doesn't require a real filesystem in tests
+        when(fileStorageService.store(anyString(), any(InputStream.class), anyString()))
+                .thenReturn("/mocked/storage/test-invoice.pdf");
     }
 
     @Test

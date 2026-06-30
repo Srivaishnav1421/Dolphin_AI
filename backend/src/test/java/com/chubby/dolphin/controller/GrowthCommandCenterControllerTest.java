@@ -25,6 +25,7 @@ public class GrowthCommandCenterControllerTest {
     @Mock private ClvForecastEngine clvEngine;
     @Mock private AiceoService ceoService;
     @Mock private com.chubby.dolphin.security.SecurityUtils securityUtils;
+    @Mock private com.chubby.dolphin.security.AccessControlService access;
 
     private GrowthCommandCenterController controller;
 
@@ -33,7 +34,7 @@ public class GrowthCommandCenterControllerTest {
         MockitoAnnotations.openMocks(this);
         when(securityUtils.currentWorkspaceId()).thenReturn("test-ws");
         controller = new GrowthCommandCenterController(
-                orchestrator, healthEngine, churnEngine, clvEngine, ceoService, securityUtils
+                orchestrator, healthEngine, churnEngine, clvEngine, ceoService, securityUtils, access
         );
     }
 

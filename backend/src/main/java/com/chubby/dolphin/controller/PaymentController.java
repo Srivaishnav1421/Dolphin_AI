@@ -4,9 +4,12 @@ import com.chubby.dolphin.entity.BrainEvent;
 import com.chubby.dolphin.entity.Wallet;
 import com.chubby.dolphin.repository.BrainEventRepository;
 import com.chubby.dolphin.repository.WalletRepository;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.RateLimiterService;
 import com.razorpay.Order;
+import com.razorpay.Payment;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import com.razorpay.Utils;
@@ -30,21 +33,24 @@ public class PaymentController {
     private final BrainEventRepository brainEventRepo;
     private final RateLimiterService   rateLimiter;
     private final com.chubby.dolphin.repository.WalletTransactionRepository txRepo;
+    private final AccessControlService access;
 
-    @Value("${razorpay.key.id}")     private String keyId;
-    @Value("${razorpay.key.secret}") private String keySecret;
-    @Value("${razorpay.currency}")   private String currency;
+    @Value("${razorpay.key.id:}")     private String keyId;
+    @Value("${razorpay.key.secret:}") private String keySecret;
+    @Value("${razorpay.currency:INR}")   private String currency;
 
     public PaymentController(SecurityUtils sec,
                              WalletRepository walletRepo,
                              BrainEventRepository brainEventRepo,
                              RateLimiterService rateLimiter,
-                             com.chubby.dolphin.repository.WalletTransactionRepository txRepo) {
+                             com.chubby.dolphin.repository.WalletTransactionRepository txRepo,
+                             AccessControlService access) {
         this.sec = sec;
         this.walletRepo = walletRepo;
         this.brainEventRepo = brainEventRepo;
         this.rateLimiter = rateLimiter;
         this.txRepo = txRepo;
+        this.access = access;
     }
 
     /**
@@ -53,6 +59,7 @@ public class PaymentController {
      */
     @PostMapping("/order")
     public ResponseEntity<?> createOrder(@RequestBody Map<String, Object> body) {
+        access.requireWorkspacePermission(Permission.WALLET_MANAGE);
         String workspaceId = sec.currentWorkspaceId();
 
         // Rate limit payment attempts
@@ -60,9 +67,19 @@ public class PaymentController {
             return ResponseEntity.status(429).body(Map.of("error", "Too many payment attempts. Try again in 1 minute."));
         }
 
-        int amountInRupees = Integer.parseInt(body.get("amount").toString());
+        Integer amountInRupees = parseRupeeAmount(body.get("amount"));
+        if (amountInRupees == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Enter a valid INR amount."));
+        }
         if (amountInRupees < 1) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Minimum amount is ₹1"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Minimum amount is INR 1"));
+        }
+        if (amountInRupees > 500000) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Maximum single payment is INR 5,00,000"));
+        }
+
+        if (keyId == null || keyId.isBlank() || keySecret == null || keySecret.isBlank()) {
+            return ResponseEntity.status(503).body(Map.of("error", "Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET."));
         }
 
         int amountInPaise = amountInRupees * 100;
@@ -86,7 +103,7 @@ public class PaymentController {
         } catch (RazorpayException e) {
             log.error("Razorpay order creation failed: {}", e.getMessage());
             return ResponseEntity.internalServerError()
-                .body(Map.of("error", "Payment gateway error: " + e.getMessage()));
+                .body(Map.of("error", "Payment gateway is temporarily unavailable. Try again shortly."));
         }
     }
 
@@ -97,10 +114,14 @@ public class PaymentController {
     @PostMapping("/verify")
     @Transactional
     public ResponseEntity<?> verifyPayment(@RequestBody Map<String, String> body) {
+        access.requireWorkspacePermission(Permission.WALLET_MANAGE);
+        if (keyId == null || keyId.isBlank() || keySecret == null || keySecret.isBlank()) {
+            return ResponseEntity.status(503).body(Map.of("error", "Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET."));
+        }
+
         String paymentId = body.get("razorpay_payment_id");
         String orderId   = body.get("razorpay_order_id");
         String signature = body.get("razorpay_signature");
-        String amountStr = body.get("amount");
 
         if (paymentId == null || orderId == null || signature == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing payment fields"));
@@ -124,7 +145,19 @@ public class PaymentController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Payment verification failed — invalid signature"));
             }
 
-            double amountInRupees = Double.parseDouble(amountStr != null ? amountStr : "0");
+            RazorpayClient client = new RazorpayClient(keyId, keySecret);
+            Payment payment = client.payments.fetch(paymentId);
+            int amountInPaise = ((Number) payment.get("amount")).intValue();
+            String paymentCurrency = payment.get("currency");
+            String paymentStatus = payment.get("status");
+            if (!currency.equals(paymentCurrency)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Payment currency mismatch"));
+            }
+            if (!"captured".equalsIgnoreCase(paymentStatus)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Payment is not captured yet"));
+            }
+
+            double amountInRupees = amountInPaise / 100.0;
             String workspaceId    = sec.currentWorkspaceId();
 
             Wallet wallet = walletRepo.findByWorkspaceId(workspaceId).orElseGet(() -> {
@@ -169,13 +202,40 @@ public class PaymentController {
         } catch (Exception e) {
             log.error("Payment verification error: {}", e.getMessage());
             return ResponseEntity.internalServerError()
-                .body(Map.of("error", "Verification error: " + e.getMessage()));
+                .body(Map.of("error", "Payment verification failed. Try again or contact support."));
         }
     }
 
     /** Public key config for frontend */
     @GetMapping("/config")
     public ResponseEntity<?> config() {
-        return ResponseEntity.ok(Map.of("key_id", keyId, "currency", currency));
+        access.requireWorkspacePermission(Permission.BILLING_READ);
+        boolean configured = keyId != null && !keyId.isBlank() && keySecret != null && !keySecret.isBlank();
+        return ResponseEntity.ok(Map.of(
+            "configured", configured,
+            "key_id", configured ? keyId : "",
+            "currency", currency == null || currency.isBlank() ? "INR" : currency,
+            "upi_supported", true,
+            "provider", "RAZORPAY"
+        ));
+    }
+
+    private Integer parseRupeeAmount(Object rawAmount) {
+        if (rawAmount == null) {
+            return null;
+        }
+        try {
+            if (rawAmount instanceof Number number) {
+                double value = number.doubleValue();
+                return value % 1 == 0 ? (int) value : null;
+            }
+            String amountText = rawAmount.toString().trim();
+            if (!amountText.matches("\\d+")) {
+                return null;
+            }
+            return Integer.parseInt(amountText);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

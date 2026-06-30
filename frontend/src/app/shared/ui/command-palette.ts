@@ -55,7 +55,7 @@ import { FormsModule } from '@angular/forms';
     </div>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .palette-backdrop {
       position: fixed;

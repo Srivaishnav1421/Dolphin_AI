@@ -3,10 +3,13 @@ package com.chubby.dolphin.controller;
 import com.chubby.dolphin.entity.User;
 import com.chubby.dolphin.entity.WorkflowApproval;
 import com.chubby.dolphin.entity.WorkflowExecution;
+import com.chubby.dolphin.audit.AuditLogService;
 import com.chubby.dolphin.repository.WorkflowApprovalRepository;
 import com.chubby.dolphin.repository.WorkflowExecutionRepository;
 import com.chubby.dolphin.repository.WorkflowTemplateRepository;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
+import com.chubby.dolphin.service.LocalApprovalSafetyService;
 import com.chubby.dolphin.service.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,13 +30,16 @@ public class WorkflowControllerTest {
     @Mock private WorkflowApprovalRepository approvalRepo;
     @Mock private WorkflowTemplateRepository templateRepo;
     @Mock private SecurityUtils sec;
+    @Mock private AccessControlService access;
+    @Mock private AuditLogService auditLogService;
+    @Mock private LocalApprovalSafetyService localApprovalSafetyService;
 
     private WorkflowController controller;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        controller = new WorkflowController(workflowService, executionRepo, approvalRepo, templateRepo, sec);
+        controller = new WorkflowController(workflowService, executionRepo, approvalRepo, templateRepo, sec, access, auditLogService, localApprovalSafetyService);
 
         User mockUser = new User();
         mockUser.setId("usr-123");
@@ -43,6 +49,10 @@ public class WorkflowControllerTest {
         when(sec.currentUser()).thenReturn(mockUser);
         when(sec.currentAccountId()).thenReturn("tenant-abc");
         when(sec.currentWorkspaceId()).thenReturn("tenant-abc");
+        when(access.currentUser()).thenReturn(mockUser);
+        when(auditLogService.redact(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        when(localApprovalSafetyService.shouldRequireApprovalOnly(anyString())).thenReturn(false);
+        when(localApprovalSafetyService.blockedMessage(anyString())).thenAnswer(inv -> inv.getArgument(0) + " is disabled in local approval-first mode. No external execution was performed.");
     }
 
     @Test
@@ -65,6 +75,29 @@ public class WorkflowControllerTest {
         assertNotNull(body);
         assertEquals("exec-001", body.getId());
         assertEquals("RUNNING", body.getStatus());
+    }
+
+    @Test
+    public void testExecuteWorkflowBlockedInLocalModeBeforeDispatch() {
+        when(localApprovalSafetyService.shouldRequireApprovalOnly("WORKFLOW_MANUAL_EXECUTION")).thenReturn(true);
+
+        ResponseEntity<?> response = controller.executeWorkflow(Map.of("message", "Send WhatsApp follow-up"));
+
+        assertEquals(403, response.getStatusCode().value());
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertNotNull(body);
+        assertEquals(false, body.get("success"));
+        assertEquals("blocked", body.get("status"));
+        assertEquals(true, body.get("approval_required"));
+        assertEquals(false, body.get("external_execution_allowed"));
+        verify(workflowService, never()).triggerWorkflow(anyString(), anyString(), anyString(), anyString());
+        verify(localApprovalSafetyService).auditBlockedExecution(
+                eq("tenant-abc"),
+                eq("WORKFLOW_MANUAL_EXECUTION"),
+                eq("WorkflowExecution"),
+                isNull(),
+                contains("before workflow row creation")
+        );
     }
 
     @Test
@@ -123,12 +156,54 @@ public class WorkflowControllerTest {
         approval.setWorkspaceId("tenant-abc");
         approval.setStatus("PENDING");
 
-        when(approvalRepo.findById("appr-999")).thenReturn(Optional.of(approval));
+        when(approvalRepo.findByIdAndWorkspaceId("appr-999", "tenant-abc")).thenReturn(Optional.of(approval));
 
         ResponseEntity<?> response = controller.respondToApproval("appr-999", payload);
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        verify(workflowService, times(1)).respondToApproval("appr-999", "APPROVED", "Checks passed");
+        verify(workflowService, times(1)).respondToApproval("appr-999", "tenant-abc", "APPROVED", "Checks passed");
+    }
+
+    @Test
+    public void testReceiveEventRejectsCrossWorkspaceExecutionId() {
+        WorkflowExecution foreign = new WorkflowExecution();
+        foreign.setExecutionId("exec-foreign");
+        foreign.setWorkspaceId("other-ws");
+        when(executionRepo.findByExecutionId("exec-foreign")).thenReturn(Optional.of(foreign));
+
+        ResponseEntity<?> response = controller.receiveEvent(Map.of(
+                "executionId", "exec-foreign",
+                "eventType", "WORKFLOW_COMPLETED",
+                "message", "done"
+        ));
+
+        assertEquals(404, response.getStatusCode().value());
+        verify(workflowService, never()).processEvent(any());
+    }
+
+    @Test
+    public void testReceiveEventBlockedInLocalModeBeforeMutation() {
+        WorkflowExecution execution = new WorkflowExecution();
+        execution.setExecutionId("exec-1");
+        execution.setWorkspaceId("tenant-abc");
+        when(executionRepo.findByExecutionId("exec-1")).thenReturn(Optional.of(execution));
+        when(localApprovalSafetyService.shouldRequireApprovalOnly("WORKFLOW_EVENT_CALLBACK")).thenReturn(true);
+
+        ResponseEntity<?> response = controller.receiveEvent(Map.of(
+                "executionId", "exec-1",
+                "eventType", "WORKFLOW_COMPLETED",
+                "message", "done"
+        ));
+
+        assertEquals(403, response.getStatusCode().value());
+        verify(workflowService, never()).processEvent(any());
+        verify(localApprovalSafetyService).auditBlockedExecution(
+                eq("tenant-abc"),
+                eq("WORKFLOW_EVENT_CALLBACK"),
+                eq("WorkflowExecution"),
+                eq("exec-1"),
+                contains("before external workflow callback mutation")
+        );
     }
 }

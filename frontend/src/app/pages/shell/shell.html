@@ -8,36 +8,48 @@
       </div>
       <div class="sidebar__logo-text" *ngIf="state.isSidebarExpanded()">
         <span class="sidebar__logo-name">DolphinAI</span>
-        <span class="sidebar__logo-tag">Operating System</span>
+        <span class="sidebar__logo-tag">Grow Faster. Work Smarter.</span>
       </div>
     </div>
 
-    <!-- Flat Navigation -->
     <nav class="sidebar__nav">
+      <div class="sidebar__workspace" *ngIf="state.isSidebarExpanded()">
+        <span class="sidebar__workspace-label">Client workspace</span>
+        <select
+          class="sidebar__workspace-select"
+          [ngModel]="activeWorkspaceId()"
+          (ngModelChange)="switchWorkspace($event)"
+          [disabled]="workspaceLoading()"
+        >
+          <option *ngFor="let workspace of workspaces()" [value]="workspace.id">
+            {{ workspace.name }} · {{ workspace.role ?? 'VIEWER' }}
+          </option>
+        </select>
+        <span class="sidebar__workspace-error" *ngIf="workspaceError()">{{ workspaceError() }}</span>
+      </div>
+
       <div class="sidebar__section-items">
         <a *ngFor="let item of navItems"
            class="sidebar__link"
            [routerLink]="item.path"
            routerLinkActive="sidebar__link--active"
            [title]="item.label">
-          <span class="material-symbols-outlined sidebar__link-icon">{{ item.icon }}</span>
+          <span class="sidebar__link-icon"><app-icon [name]="item.icon" [size]="18"></app-icon></span>
           <span class="sidebar__link-label" *ngIf="state.isSidebarExpanded()">{{ item.label }}</span>
         </a>
       </div>
     </nav>
 
-    <!-- Sidebar footer profile & theme toggler -->
-    <!-- Sidebar footer profile & theme toggler -->
     <div class="sidebar__footer">
       <div class="sidebar__theme-toggle" *ngIf="state.isSidebarExpanded()">
         <button class="theme-btn" [class.theme-btn--active]="state.theme() === 'light'" (click)="state.setTheme('light')" title="Light Mode">
-          <span class="material-symbols-outlined font-icon">light_mode</span>
+          <app-icon name="sun" [size]="16"></app-icon>
         </button>
         <button class="theme-btn" [class.theme-btn--active]="state.theme() === 'dark'" (click)="state.setTheme('dark')" title="Dark Mode">
-          <span class="material-symbols-outlined font-icon">dark_mode</span>
+          <app-icon name="moon" [size]="16"></app-icon>
         </button>
         <button class="theme-btn" [class.theme-btn--active]="state.theme() === 'system'" (click)="state.setTheme('system')" title="System Theme">
-          <span class="material-symbols-outlined font-icon">desktop_windows</span>
+          <app-icon name="monitor" [size]="16"></app-icon>
         </button>
       </div>
 
@@ -54,10 +66,10 @@
         
         <div class="sidebar__actions" [class.sidebar__actions--vertical]="!state.isSidebarExpanded()">
           <button class="sidebar__action-btn" title="Change Password" (click)="openPwdModal()">
-            <span class="material-symbols-outlined font-icon">vpn_key</span>
+            <app-icon name="key" [size]="16"></app-icon>
           </button>
           <button class="sidebar__action-btn sidebar__action-btn--logout" title="Logout" (click)="logout()">
-            <span class="material-symbols-outlined font-icon">logout</span>
+            <app-icon name="logout" [size]="16"></app-icon>
           </button>
         </div>
       </div>
@@ -66,13 +78,51 @@
 
   <!-- Main Content Container -->
   <main class="shell__content">
+    <section class="ai-route-bar" *ngIf="canManageAiRouting()">
+      <div class="ai-route-bar__copy">
+        <span class="ai-route-bar__eyebrow">Section AI</span>
+        <strong>{{ currentTaskLabel() }}</strong>
+        <span>{{ selectedAiLabel() }}</span>
+      </div>
+
+      <div class="ai-route-bar__controls">
+        <label>
+          Default
+          <select
+            [ngModel]="defaultAiProvider()"
+            (ngModelChange)="onDefaultProviderChange($event)"
+            [disabled]="aiRoutingSaving() || usableProviders().length === 0"
+          >
+            <option *ngFor="let provider of usableProviders()" [value]="provider.provider">
+              {{ provider.provider }} · {{ provider.model }}
+            </option>
+          </select>
+        </label>
+
+        <label>
+          This section
+          <select
+            [ngModel]="selectedAiProvider()"
+            (ngModelChange)="onTaskProviderChange($event)"
+            [disabled]="aiRoutingSaving() || usableProviders().length === 0"
+          >
+            <option value="DEFAULT">Use default</option>
+            <option *ngFor="let provider of usableProviders()" [value]="provider.provider">
+              {{ provider.provider }} · {{ provider.model }}
+            </option>
+          </select>
+        </label>
+      </div>
+
+      <span class="ai-route-bar__error" *ngIf="aiRoutingError()">{{ aiRoutingError() }}</span>
+    </section>
     <router-outlet />
   </main>
 
 </div>
 
 <!-- Password Change Modal using UiModal component -->
-<ui-modal [show]="showPwdModal()" title="🔑 Change Password" (closed)="closePwdModal()">
+<ui-modal [show]="showPwdModal()" title="Change password" (closed)="closePwdModal()">
   <div class="form-group">
     <label class="ui-label">Current Password</label>
     <input class="input" type="password" [(ngModel)]="pwd.old" placeholder="••••••••" />
@@ -93,7 +143,7 @@
     <button class="btn btn-ghost" (click)="closePwdModal()">Cancel</button>
     <button class="btn btn-primary" (click)="changePassword()" [disabled]="pwdSaving()">
       <span *ngIf="pwdSaving()">Saving…</span>
-      <span *ngIf="!pwdSaving()">🔑 Update Password</span>
+      <span *ngIf="!pwdSaving()">Update password</span>
     </button>
   </div>
 </ui-modal>

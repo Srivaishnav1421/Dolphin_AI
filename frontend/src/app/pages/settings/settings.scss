@@ -1,36 +1,21 @@
-@import '../../../styles/design-tokens.scss';
+@use '../../../styles/design-tokens.scss' as *;
 
 .settings-page {
-  padding: $spacing-32;
-  height: 100vh;
   display: flex;
   flex-direction: column;
   gap: $spacing-24;
-  overflow-y: auto;
-  max-width: $max-content-width;
-  margin: 0 auto;
 }
 
 .settings-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-  padding-bottom: $spacing-16;
-}
-
-.settings-title {
-  font-family: $font-family;
-  font-size: $font-title;
-  font-weight: 700;
-  color: $text-primary;
-  letter-spacing: -0.5px;
+  padding-bottom: 0;
 }
 
 .settings-subtitle {
   font-family: $font-family;
-  font-size: $font-caption;
-  color: $text-secondary;
+  color: var(--text-secondary);
 }
 
 .settings-alert {
@@ -52,7 +37,7 @@
 .panel-desc {
   font-family: $font-family;
   font-size: $font-caption;
-  color: $text-secondary;
+  color: var(--text-secondary);
   margin-bottom: $spacing-24;
 }
 
@@ -76,17 +61,17 @@
   font-family: $font-family;
   font-size: $font-caption;
   font-weight: 600;
-  color: $text-primary;
+  color: var(--text-primary);
 }
 
 .form-input {
-  background: $bg-elevated;
-  border: 1px solid $border-color;
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  border: 1px solid var(--border);
   border-radius: $radius-md;
-  padding: $spacing-10 $spacing-14;
+  padding: $spacing-10 14px;
   font-family: $font-family;
   font-size: $font-caption;
-  color: $text-primary;
+  color: var(--text-primary);
   transition: border-color $transition-fast;
 
   &:focus {
@@ -105,18 +90,23 @@
 }
 
 .form-select {
-  background: $bg-elevated;
-  border: 1px solid $border-color;
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  border: 1px solid var(--border);
   border-radius: $radius-md;
-  padding: $spacing-10 $spacing-14;
+  padding: $spacing-10 14px;
   font-family: $font-family;
   font-size: $font-caption;
-  color: $text-primary;
+  color: var(--text-primary);
   cursor: pointer;
 
   &:focus {
     outline: none;
     border-color: $accent-primary;
+  }
+
+  &:disabled {
+    opacity: .58;
+    cursor: not-allowed;
   }
 }
 
@@ -134,7 +124,7 @@
 .hint {
   font-family: $font-family;
   font-size: $font-meta;
-  color: $text-muted;
+  color: var(--text-muted);
   line-height: 1.4;
 }
 
@@ -175,7 +165,7 @@
 
 .ai-telemetry-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: $spacing-24;
   margin-bottom: $spacing-24;
 }
@@ -184,17 +174,18 @@
   display: flex;
   flex-direction: column;
   gap: $spacing-8;
-  padding: $spacing-16;
-  background: rgba(255, 255, 255, 0.01);
-  border: 1px solid rgba(255, 255, 255, 0.015);
-  border-radius: $radius-md;
+  padding: $spacing-24;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 }
 
 .telemetry-title {
   font-family: $font-family;
   font-size: 11px;
   font-weight: 700;
-  color: $text-muted;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -203,12 +194,12 @@
   font-family: $font-family;
   font-size: $font-title;
   font-weight: 700;
-  color: $text-primary;
+  color: var(--text-primary);
 }
 
 .telemetry-progress-bg {
   height: 4px;
-  background: $bg-elevated;
+  background: color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 2px;
   overflow: hidden;
   width: 100%;
@@ -223,7 +214,36 @@
 .telemetry-hint {
   font-family: $font-family;
   font-size: 10px;
-  color: $text-muted;
+  color: var(--text-muted);
+}
+
+.runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: $spacing-16;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-4;
+    padding: $spacing-16;
+    border: 1px solid var(--border);
+    border-radius: $radius-md;
+    background: var(--bg-card);
+  }
+
+  span {
+    font-family: $font-family;
+    font-size: $font-meta;
+    color: var(--text-muted);
+  }
+
+  strong {
+    font-family: $font-family;
+    font-size: $font-caption;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
 }
 
 .provider-selector-grid {
@@ -302,6 +322,314 @@
   padding-top: $spacing-24;
 }
 
+.team-list,
+.security-grid {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-16;
+}
+
+.access-control-panel {
+  padding: $spacing-20;
+  margin-bottom: $spacing-24;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 94%, transparent), color-mix(in srgb, var(--bg-surface) 60%, transparent));
+  box-shadow: var(--shadow-sm);
+}
+
+.access-control-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-16;
+  margin-bottom: $spacing-16;
+
+  h3 {
+    margin: $spacing-4 0 0;
+    font-size: 20px;
+    color: var(--text-primary);
+  }
+}
+
+.access-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-8;
+}
+
+.access-matrix__row {
+  display: grid;
+  grid-template-columns: .75fr 1.25fr 1.25fr 1.25fr 1.25fr;
+  gap: $spacing-12;
+  align-items: center;
+  padding: $spacing-12;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-card) 66%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+
+  strong {
+    color: var(--text-primary);
+  }
+
+  &--head {
+    background: color-mix(in srgb, var(--bg-surface) 86%, transparent);
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+}
+
+.team-row,
+.security-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-16;
+  padding: $spacing-16;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+}
+
+.team-row__person,
+.team-row__actions,
+.security-card {
+  display: flex;
+  align-items: center;
+  gap: $spacing-12;
+}
+
+.team-row__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.team-row__name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.team-row__email {
+  color: var(--text-muted);
+  font-size: $font-caption;
+}
+
+.automation-empty {
+  margin-top: $spacing-20;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--bg-card) 55%, transparent);
+}
+
+.billing-card {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-20;
+
+  h3 {
+    font-size: 26px;
+    margin: $spacing-8 0;
+  }
+}
+
+.billing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: $spacing-24;
+  align-items: center;
+  padding: $spacing-28;
+  margin-bottom: $spacing-24;
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 34%),
+    linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 92%, transparent), color-mix(in srgb, var(--bg-surface) 72%, transparent));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255,255,255,0.10);
+  backdrop-filter: blur(24px) saturate(150%);
+
+  h3 {
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.05;
+    margin: $spacing-8 0 $spacing-12;
+  }
+}
+
+.billing-hero__copy {
+  min-width: 0;
+}
+
+.billing-hero__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-12;
+  margin-top: $spacing-20;
+}
+
+.billing-hero__price {
+  min-width: 220px;
+  padding: $spacing-24;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--bg-card) 58%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  text-align: right;
+
+  span,
+  small {
+    display: block;
+    color: var(--text-muted);
+    font-size: $font-caption;
+  }
+
+  strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 34px;
+    margin: $spacing-6 0;
+  }
+}
+
+.billing-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: $spacing-16;
+  margin-bottom: $spacing-24;
+}
+
+.billing-plan-card {
+  text-align: left;
+  display: grid;
+  gap: $spacing-10;
+  min-height: 180px;
+  padding: $spacing-20;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 58%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: $font-family;
+  transition: transform $transition-fast, border-color $transition-fast, background $transition-fast, box-shadow $transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+    background: var(--bg-card-hover);
+  }
+
+  &--active {
+    border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+    background: color-mix(in srgb, var(--accent) 14%, var(--bg-card));
+    box-shadow: 0 18px 38px rgba(10, 132, 255, 0.16);
+  }
+
+  > span:not(.billing-plan-card__top) {
+    font-size: $font-caption;
+  }
+}
+
+.billing-plan-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-12;
+  color: var(--text-primary);
+
+  strong,
+  small {
+    display: block;
+  }
+
+  strong {
+    font-size: 16px;
+    margin-bottom: $spacing-4;
+  }
+
+  small {
+    color: var(--text-muted);
+    font-size: $font-caption;
+  }
+}
+
+.billing-lower-grid {
+  align-items: stretch;
+}
+
+.billing-facts {
+  display: grid;
+  gap: $spacing-10;
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: $spacing-16;
+    color: var(--text-secondary);
+  }
+
+  strong {
+    color: var(--text-primary);
+  }
+}
+
+.quota-label {
+  display: flex;
+  justify-content: space-between;
+  gap: $spacing-16;
+  margin-bottom: $spacing-8;
+  color: var(--text-secondary);
+  font-size: $font-caption;
+}
+
+.invoice-section {
+  margin-top: $spacing-32;
+}
+
+.security-card {
+  align-items: flex-start;
+  justify-content: flex-start;
+
+  .security-card__icon {
+    color: var(--accent);
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  h4 {
+    margin-bottom: $spacing-4;
+    color: var(--text-primary);
+  }
+
+  p {
+    color: var(--text-secondary);
+    line-height: 1.5;
+    font-size: $font-caption;
+  }
+}
+
+.settings-integrations-pane app-integrations {
+  display: block;
+  margin: -40px -48px 0;
+}
+
 .section-title {
   font-family: $font-family;
   font-size: 16px;
@@ -356,6 +684,18 @@
     grid-column: span 1;
   }
   .ai-telemetry-grid {
+    grid-template-columns: 1fr;
+  }
+  .billing-hero,
+  .billing-plan-grid,
+  .billing-lower-grid {
+    grid-template-columns: 1fr;
+  }
+  .billing-hero__price {
+    text-align: left;
+    min-width: 0;
+  }
+  .access-matrix__row {
     grid-template-columns: 1fr;
   }
 }

@@ -69,7 +69,7 @@ public class JpaAuditAspect {
             audit.setActorType(actorType);
             audit.setEntityType(resourceType);
             audit.setEntityId(id);
-            audit.setNewValue(result.toString());
+            audit.setNewValue(redactedEntitySummary(resourceType, id, workspaceId));
             
             auditLogRepo.save(audit);
             log.info("📝 System Audit: Automatically logged SAVE on {} (id={}, workspaceId={}) by user={}", resourceType, id, workspaceId, userEmail);
@@ -163,5 +163,24 @@ public class JpaAuditAspect {
             return auth.getName();
         }
         return "system-daemon";
+    }
+
+    private String redactedEntitySummary(String resourceType, String id, String workspaceId) {
+        return redact("entityType=" + resourceType + "; entityId=" + id + "; workspaceId=" + workspaceId);
+    }
+
+    private String redact(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String redacted = value;
+        String[] sensitiveKeys = {
+                "password", "token", "secret", "apiKey", "api_key", "refreshToken",
+                "accessToken", "authorization", "credential", "webhookSecret"
+        };
+        for (String key : sensitiveKeys) {
+            redacted = redacted.replaceAll("(?i)(" + key + "\\s*[=:]\\s*)[^;,\\s}]+", "$1[REDACTED]");
+        }
+        return redacted.length() <= 1000 ? redacted : redacted.substring(0, 1000);
     }
 }

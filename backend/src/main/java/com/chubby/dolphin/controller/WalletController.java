@@ -4,8 +4,11 @@ import com.chubby.dolphin.entity.Wallet;
 import com.chubby.dolphin.entity.WalletTransaction;
 import com.chubby.dolphin.repository.WalletRepository;
 import com.chubby.dolphin.repository.WalletTransactionRepository;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.AlertService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,19 +25,26 @@ public class WalletController {
     private final WalletTransactionRepository txRepo;
     private final SecurityUtils               sec;
     private final AlertService                alertService;
+    private final AccessControlService        access;
+
+    @Value("${app.billing.manual-wallet-funding-enabled:false}")
+    private boolean manualWalletFundingEnabled;
 
     public WalletController(WalletRepository walletRepo,
                             WalletTransactionRepository txRepo,
                             SecurityUtils sec,
-                            AlertService alertService) {
+                            AlertService alertService,
+                            AccessControlService access) {
         this.walletRepo = walletRepo;
         this.txRepo = txRepo;
         this.sec = sec;
         this.alertService = alertService;
+        this.access = access;
     }
 
     @GetMapping
     public ResponseEntity<Wallet> get() {
+        access.requireWorkspacePermission(Permission.WALLET_READ);
         return walletRepo.findFirstByWorkspaceId(sec.currentWorkspaceId())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -43,7 +53,13 @@ public class WalletController {
     /** Manual fund (fallback without Razorpay) */
     @PostMapping("/fund")
     @Transactional
-    public ResponseEntity<Wallet> fund(@RequestBody Map<String, Double> body) {
+    public ResponseEntity<?> fund(@RequestBody Map<String, Double> body) {
+        access.requireWorkspacePermission(Permission.WALLET_MANAGE);
+        if (!manualWalletFundingEnabled) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "Manual wallet funding is disabled. Use the verified payment gateway flow."
+            ));
+        }
         String workspaceId = sec.currentWorkspaceId();
         double amount = body.getOrDefault("amount", 0.0);
         if (amount <= 0) return ResponseEntity.badRequest().build();
@@ -67,6 +83,7 @@ public class WalletController {
     @PutMapping("/limit")
     @Transactional
     public ResponseEntity<Wallet> updateLimit(@RequestBody Map<String, Double> body) {
+        access.requireWorkspacePermission(Permission.WALLET_MANAGE);
         return walletRepo.findByWorkspaceId(sec.currentWorkspaceId()).map(w -> {
             w.setDailyBudgetLimit(body.getOrDefault("daily_budget_limit", w.getDailyBudgetLimit()));
             w.setUpdatedAt(LocalDateTime.now());
@@ -77,6 +94,7 @@ public class WalletController {
     /** Full transaction history — latest 50 */
     @GetMapping("/transactions")
     public ResponseEntity<List<WalletTransaction>> transactions() {
+        access.requireWorkspacePermission(Permission.WALLET_READ);
         String workspaceId = sec.currentWorkspaceId();
         return ResponseEntity.ok(txRepo.findTop50ByWorkspaceIdOrderByCreatedAtDesc(workspaceId));
     }

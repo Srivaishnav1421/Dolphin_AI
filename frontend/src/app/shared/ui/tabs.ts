@@ -1,5 +1,6 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { AppIcon } from './icon';
 
 export interface TabItem {
   id: string;
@@ -10,7 +11,7 @@ export interface TabItem {
 @Component({
   selector: 'ui-tabs',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, AppIcon],
   template: `
     <div class="ui-tabs-container">
       <div class="ui-tabs-list">
@@ -20,14 +21,14 @@ export interface TabItem {
           (click)="selectTab(tab.id)"
           class="ui-tab-btn"
         >
-          <span *ngIf="tab.icon" class="ui-tab-icon">{{ tab.icon }}</span>
+          <span *ngIf="tab.icon" class="ui-tab-icon"><app-icon [name]="tab.icon" [size]="15"></app-icon></span>
           {{ tab.label }}
         </button>
       </div>
     </div>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .ui-tabs-container {
       width: 100%;
@@ -36,38 +37,46 @@ export interface TabItem {
 
     .ui-tabs-list {
       display: flex;
-      gap: $spacing-16;
+      gap: $spacing-8;
       margin-bottom: -1px;
+      overflow-x: auto;
+      padding-bottom: 2px;
     }
 
     .ui-tab-btn {
       display: inline-flex;
       align-items: center;
       gap: $spacing-8;
-      padding: $spacing-8 0;
-      background: transparent;
-      border: none;
+      min-height: 38px;
+      padding: $spacing-8 $spacing-12;
+      background: color-mix(in srgb, var(--bg-card) 42%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      border-radius: 999px;
       outline: none;
       color: $text-muted;
       font-family: $font-family;
       font-size: $font-caption;
       font-weight: 500;
       cursor: pointer;
-      border-bottom: 2px solid transparent;
+      white-space: nowrap;
       transition: all $transition-fast;
 
       &:hover {
         color: $text-secondary;
+        background: var(--bg-card-hover);
       }
     }
 
     .ui-tab-btn--active {
       color: $text-primary;
-      border-bottom-color: $accent-primary;
+      border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+      background: color-mix(in srgb, var(--accent) 15%, var(--bg-card));
+      box-shadow: var(--shadow-sm);
     }
 
     .ui-tab-icon {
-      font-size: $font-body;
+      display: inline-flex;
+      color: var(--accent);
     }
   `]
 })

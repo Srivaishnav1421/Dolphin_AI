@@ -4,7 +4,9 @@ import com.chubby.dolphin.dto.ai.LlmRequest;
 import com.chubby.dolphin.dto.ai.LlmResponse;
 import com.chubby.dolphin.entity.LlmProvider;
 import com.chubby.dolphin.entity.WorkspaceAiConfig;
+import com.chubby.dolphin.repository.IntegrationSettingRepository;
 import com.chubby.dolphin.repository.WorkspaceAiConfigRepository;
+import com.chubby.dolphin.repository.WorkspaceAiTaskRouteRepository;
 import com.chubby.dolphin.service.ai.cache.AiCacheService;
 import com.chubby.dolphin.service.ai.cache.PromptHashService;
 import com.chubby.dolphin.service.ai.audit.AiBudgetService;
@@ -25,6 +27,12 @@ public class AiProviderRouterServiceTest {
 
     @Mock
     private WorkspaceAiConfigRepository workspaceAiConfigRepo;
+
+    @Mock
+    private IntegrationSettingRepository integrationSettingRepository;
+
+    @Mock
+    private WorkspaceAiTaskRouteRepository workspaceAiTaskRouteRepository;
 
     @Mock
     private PromptHashService promptHashService;
@@ -70,6 +78,8 @@ public class AiProviderRouterServiceTest {
         llmRouterService = new AiProviderRouterService(
                 services, 
                 workspaceAiConfigRepo,
+                integrationSettingRepository,
+                workspaceAiTaskRouteRepository,
                 promptHashService,
                 aiCacheService,
                 aiUsageAuditService,
@@ -175,5 +185,37 @@ public class AiProviderRouterServiceTest {
         LlmResponse actual = llmRouterService.ask("ws-1", request);
         assertNotNull(actual);
         assertEquals("[OLLAMA STUB]", actual.getContent());
+    }
+
+    @Test
+    public void testAskFallsBackWhenResolvedProviderFails() {
+        llmRouterService.init();
+
+        when(ollamaService.isEnabled()).thenReturn(true);
+        when(ollamaService.isAvailable()).thenReturn(true);
+        when(mockService.isEnabled()).thenReturn(true);
+        when(mockService.isAvailable()).thenReturn(true);
+        when(workspaceAiConfigRepo.findByWorkspaceId("ws-1")).thenReturn(Optional.empty());
+        when(aiCacheService.get(anyString())).thenReturn(Optional.empty());
+
+        LlmRequest request = LlmRequest.builder()
+                .workspaceId("ws-1")
+                .taskKey("CREATIVE_STUDIO")
+                .prompt("Generate ad copy")
+                .build();
+
+        when(ollamaService.ask(request)).thenThrow(new RuntimeException("Ollama offline"));
+        when(mockService.ask(request)).thenReturn(LlmResponse.builder()
+                .content("fallback response")
+                .provider("MOCK")
+                .model("mock")
+                .build());
+
+        LlmResponse actual = llmRouterService.ask("ws-1", request);
+
+        assertNotNull(actual);
+        assertEquals("fallback response", actual.getContent());
+        assertEquals("MOCK", actual.getProvider());
+        verify(mockService, times(1)).ask(request);
     }
 }

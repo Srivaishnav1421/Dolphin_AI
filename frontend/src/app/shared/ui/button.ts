@@ -17,7 +17,7 @@ import { CommonModule } from '@angular/common';
     </button>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .ui-btn {
       display: inline-flex;

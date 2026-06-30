@@ -3,6 +3,7 @@ package com.chubby.dolphin.service;
 import com.chubby.dolphin.entity.*;
 import com.chubby.dolphin.repository.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class CreativeFatigueService {
     private final MetaAdsService metaAdsService;
     private final BrainDecisionRepository decisionRepo;
     private final AlertService alertService;
+    private final LocalApprovalSafetyService localApprovalSafetyService;
 
     public CreativeFatigueService(AdCreativeRepository creativeRepo,
                                   MetricSnapshotRepository metricRepo,
@@ -39,6 +41,20 @@ public class CreativeFatigueService {
                                   MetaAdsService metaAdsService,
                                   BrainDecisionRepository decisionRepo,
                                   AlertService alertService) {
+        this(creativeRepo, metricRepo, fatigueAlertRepo, campaignRepo, metaConnRepo,
+                metaAdsService, decisionRepo, alertService, null);
+    }
+
+    @Autowired
+    public CreativeFatigueService(AdCreativeRepository creativeRepo,
+                                  MetricSnapshotRepository metricRepo,
+                                  FatigueAlertRepository fatigueAlertRepo,
+                                  CampaignRepository campaignRepo,
+                                  MetaConnectionRepository metaConnRepo,
+                                  MetaAdsService metaAdsService,
+                                  BrainDecisionRepository decisionRepo,
+                                  AlertService alertService,
+                                  LocalApprovalSafetyService localApprovalSafetyService) {
         this.creativeRepo = creativeRepo;
         this.metricRepo = metricRepo;
         this.fatigueAlertRepo = fatigueAlertRepo;
@@ -47,6 +63,7 @@ public class CreativeFatigueService {
         this.metaAdsService = metaAdsService;
         this.decisionRepo = decisionRepo;
         this.alertService = alertService;
+        this.localApprovalSafetyService = localApprovalSafetyService;
     }
 
     /**
@@ -147,6 +164,16 @@ public class CreativeFatigueService {
 
         Campaign campaign = campaignRepo.findById(alert.getCampaignId()).orElse(null);
         if (campaign == null) return;
+        if (localSafetyBlocks("CREATIVE_FATIGUE_ROTATION")) {
+            localApprovalSafetyService.auditBlockedExecution(
+                    campaign.getAccountId(),
+                    "CREATIVE_FATIGUE_ROTATION",
+                    "FatigueAlert",
+                    alert.getId(),
+                    "Creative fatigue rotation blocked before Meta pause/resume and local creative mutations."
+            );
+            return;
+        }
 
         // Find next DRAFT creative with highest predicted CTR
         List<AdCreative> drafts = creativeRepo.findByCampaignIdAndStatus(alert.getCampaignId(), "DRAFT");
@@ -207,5 +234,9 @@ public class CreativeFatigueService {
                 LocalDate.now().minusDays(3).toString(),
                 LocalDate.now().toString()
         );
+    }
+
+    private boolean localSafetyBlocks(String action) {
+        return localApprovalSafetyService != null && localApprovalSafetyService.shouldRequireApprovalOnly(action);
     }
 }

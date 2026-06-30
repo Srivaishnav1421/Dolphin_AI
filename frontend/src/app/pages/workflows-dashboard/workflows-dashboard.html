@@ -1,54 +1,73 @@
-<div class="workflows-container animate-fade-in">
+<div class="workflows-container page animate-fade-in">
   <!-- Header -->
   <div class="workflows-header">
     <div class="header-title">
-      <h1>⚡ Automation Hub</h1>
-      <p>Configure templates, review activity history, and authorize pending lead follow-ups.</p>
+      <h1>Automation</h1>
+      <p>Simple automations anyone can use: send WhatsApp, assign leads, create reminders, and move work forward.</p>
     </div>
 
     <!-- Trigger Panel -->
     <div class="trigger-panel">
       <input 
         type="text" 
-        placeholder="Enter natural language automation prompt..." 
+        placeholder="Example: New lead comes in, send WhatsApp, assign salesperson, remind after 2 days" 
         [ngModel]="customMessage()"
         (ngModelChange)="customMessage.set($event)"
         (keyup.enter)="triggerCustomWorkflow()"
-        [disabled]="submittingWorkflow()"
+        [disabled]="submittingWorkflow() || localModeEnabled()"
       />
-      <button (click)="triggerCustomWorkflow()" [disabled]="submittingWorkflow()">
-        {{ submittingWorkflow() ? 'Spawning...' : 'Run Trigger' }}
+      <button (click)="triggerCustomWorkflow()" [disabled]="submittingWorkflow() || localModeEnabled() || !customMessage().trim()">
+        {{ localModeEnabled() ? 'Execution disabled' : (submittingWorkflow() ? 'Starting...' : 'Start automation') }}
       </button>
     </div>
   </div>
+
+  @if (localModeEnabled()) {
+    <div class="local-mode-warning">
+      <strong>Local approval-first mode is enabled.</strong>
+      <span>Manual workflow execution, external sends, Meta actions, calls, and scheduler-style mutations are blocked. Existing activity, templates, and approvals remain read-only.</span>
+    </div>
+  }
+
+  @if (runtimeUnavailable()) {
+    <div class="workflow-alert workflow-alert--warning">
+      Runtime status is unavailable, so automation execution is disabled by default.
+    </div>
+  }
+
+  @if (workflowNotice()) {
+    <div class="workflow-alert">
+      {{ workflowNotice() }}
+    </div>
+  }
 
   <!-- Metric Cards -->
   <div class="metric-grid">
     <div class="metric-card card-running">
       <div class="card-icon">🌀</div>
       <div class="card-info">
-        <span class="label">Active Automations</span>
+        <span class="label">Active automations</span>
         <span class="value">{{ stats().activeCount }}</span>
       </div>
     </div>
     <div class="metric-card card-completed">
       <div class="card-icon">✅</div>
       <div class="card-info">
-        <span class="label">Completed Runs</span>
+        <span class="label">Completed runs</span>
         <span class="value">{{ stats().completedCount }}</span>
       </div>
     </div>
     <div class="metric-card card-failed">
       <div class="card-icon">❌</div>
       <div class="card-info">
-        <span class="label">Failed Runs</span>
+        <span class="label">Needs attention</span>
         <span class="value">{{ stats().failedCount }}</span>
       </div>
     </div>
     <div class="metric-card card-duration">
       <div class="card-icon">⏱️</div>
       <div class="card-info">
-        <span class="label">Avg Process Latency</span>
+        <span class="label">Average run time</span>
         <span class="value">{{ stats().averageDurationMs / 1000 | number:'1.1-2' }}s</span>
       </div>
     </div>
@@ -61,21 +80,21 @@
       [class.active]="activeTab() === 'executions'" 
       (click)="activeTab.set('executions')"
     >
-      Activity Logs
+      Activity
     </button>
     <button 
       class="tab-btn" 
       [class.active]="activeTab() === 'templates'" 
       (click)="activeTab.set('templates')"
     >
-      Automation Templates
+      Templates
     </button>
     <button 
       class="tab-btn" 
       [class.active]="activeTab() === 'approvals'" 
       (click)="activeTab.set('approvals')"
     >
-      Pending Approvals @if (approvals().length > 0) { <span class="badge">{{ approvals().length }}</span> }
+      Approvals @if (approvals().length > 0) { <span class="badge">{{ approvals().length }}</span> }
     </button>
   </div>
 
@@ -84,9 +103,14 @@
     @if (loading()) {
       <div class="spinner-container">
         <div class="spinner"></div>
-        <p>Retrieving activity logs...</p>
+        <p>Loading activity...</p>
       </div>
     } @else {
+      @if (workflowError()) {
+        <div class="workflow-alert workflow-alert--error">
+          {{ workflowError() }}
+        </div>
+      }
 
       <!-- Executions List -->
       @if (activeTab() === 'executions') {
@@ -94,9 +118,9 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Automation Name</th>
-                <th>Execution ID</th>
-                <th>Context Agent</th>
+                <th>Automation</th>
+                <th>Run</th>
+                <th>Team</th>
                 <th>Status</th>
                 <th>Started</th>
                 <th>Duration</th>
@@ -113,7 +137,7 @@
                   </td>
                   <td>
                     <div class="trace-group">
-                      <span class="exec-id">ID: {{ exec.executionId | slice:0:8 }}</span>
+                      <span class="exec-id">Run {{ exec.executionId | slice:0:8 }}</span>
                     </div>
                   </td>
                   <td><span class="agent-pill">{{ exec.agentUsed || 'SDR Agent' }}</span></td>
@@ -132,13 +156,13 @@
                       <div class="exec-details-grid">
                         @if (exec.userRequest) {
                           <div class="detail-block">
-                            <span class="block-title">Trigger Context</span>
+                            <span class="block-title">Request</span>
                             <pre>{{ exec.userRequest }}</pre>
                           </div>
                         }
                         @if (exec.finalResponse) {
                           <div class="detail-block">
-                            <span class="block-title">Execution Result</span>
+                            <span class="block-title">Result</span>
                             <pre class="success-pre">{{ exec.finalResponse }}</pre>
                           </div>
                         }
@@ -154,7 +178,7 @@
                 }
               } @empty {
                 <tr>
-                  <td colspan="6" class="empty-state">No automation activity logs found for this workspace.</td>
+                  <td colspan="6" class="empty-state">No automation activity yet.</td>
                 </tr>
               }
             </tbody>
@@ -174,9 +198,14 @@
               <p class="tmpl-card__desc">{{ tmpl.description }}</p>
               <div class="tmpl-card__footer">
                 <button (click)="customMessage.set('Deploy template: ' + tmpl.name); activeTab.set('executions')">
-                  Deploy Automation
+                  Use template
                 </button>
               </div>
+            </div>
+          } @empty {
+            <div class="empty-state">
+              <h3>No automation templates found</h3>
+              <p>Templates will appear here after they are available in the database.</p>
             </div>
           }
         </div>
@@ -188,23 +217,23 @@
           @for (appr of approvals(); track appr.id) {
             <div class="approval-card">
               <div class="approval-card__header">
-                <h3>Automation Action Pending Approval</h3>
+                <h3>Action pending approval</h3>
                 <span class="time">{{ appr.createdAt | date:'short' }}</span>
               </div>
-              <p>Action Ref: <code>{{ appr.executionId }}</code></p>
+              <p>Run: <code>{{ appr.executionId }}</code></p>
 
               <div class="decision-form">
                 <input 
                   type="text" 
-                  placeholder="Decision reason/notes..." 
+                  placeholder="Add a short note" 
                   [(ngModel)]="approvalReason"
                 />
                 <div class="btn-group">
                   <button class="btn-approve" (click)="respondToApproval(appr.id, 'APPROVED')">
-                    Approve & Run
+                    Approve
                   </button>
                   <button class="btn-reject" (click)="respondToApproval(appr.id, 'REJECTED')">
-                    Reject Action
+                    Reject
                   </button>
                 </div>
               </div>
@@ -212,8 +241,8 @@
           } @empty {
             <div class="empty-state">
               <span class="icon">🛡️</span>
-              <h3>No actions require approval</h3>
-              <p>All automated triggers are running seamlessly within parameters.</p>
+              <h3>No approvals waiting</h3>
+              <p>Your automation approvals are clear.</p>
             </div>
           }
         </div>

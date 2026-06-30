@@ -12,7 +12,7 @@ import { CommonModule } from '@angular/common';
     </span>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .ui-badge {
       display: inline-flex;

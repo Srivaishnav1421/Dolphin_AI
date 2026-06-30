@@ -1,10 +1,8 @@
 # ══════════════════════════════════════════════════════════════
 #  DolphinAI — docker-compose.yml
 #  Run: docker-compose up -d
-#  Full stack: Backend + Frontend + PostgreSQL + Redis + Ollama
+#  Full stack: Gateway + Frontend + Backend + PostgreSQL + Redis + RabbitMQ + MinIO + Ollama + Observability
 # ══════════════════════════════════════════════════════════════
-
-version: '3.9'
 
 services:
 
@@ -42,6 +40,43 @@ services:
       timeout: 3s
       retries: 3
 
+  # ── RabbitMQ Queue (Brain decisions + webhook jobs) ────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: dolphin_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-dolphin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-dolphin123}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MinIO Object Store (creatives, invoices, reports) ──────────
+  minio:
+    image: minio/minio:RELEASE.2026-05-21T19-22-30Z
+    container_name: dolphin_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-dolphin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-dolphin12345}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   # ── Ollama (Local LLM — Mistral 7B) ───────────────────────────
   ollama:
     image: ollama/ollama:latest
@@ -76,13 +111,19 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE:     prod
+      SPRING_PROFILES_ACTIVE:     ${SPRING_PROFILES_ACTIVE:-dev}
       SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/dolphindb
       SPRING_DATASOURCE_USERNAME: dolphin
       SPRING_DATASOURCE_PASSWORD: dolphin123
       REDIS_HOST:                 redis
       REDIS_PORT:                 6379
+      SPRING_RABBITMQ_HOST:       rabbitmq
+      SPRING_RABBITMQ_PORT:       5672
+      SPRING_RABBITMQ_USERNAME:   ${RABBITMQ_USER:-dolphin}
+      SPRING_RABBITMQ_PASSWORD:   ${RABBITMQ_PASSWORD:-dolphin123}
       OLLAMA_BASE_URL:            http://ollama:11434
       OLLAMA_MODEL:               ${OLLAMA_MODEL:-mistral:7b-instruct-v0.3-q4_K_M}
       OLLAMA_ENABLED:             "true"
@@ -91,8 +132,10 @@ services:
       META_APP_SECRET:            ${META_APP_SECRET:-}
       META_REDIRECT_URI:          ${META_REDIRECT_URI:-http://localhost:4200/meta/callback}
       META_WEBHOOK_VERIFY_TOKEN:  ${META_WEBHOOK_VERIFY_TOKEN:-dolphin_verify_2026}
+      CORS_ORIGINS:               ${CORS_ORIGINS:-http://localhost:4200,http://localhost:4201,http://localhost}
       RAZORPAY_KEY_ID:            ${RAZORPAY_KEY_ID}
       RAZORPAY_KEY_SECRET:        ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_WEBHOOK_SECRET:    ${RAZORPAY_WEBHOOK_SECRET:-}
       MAIL_USER:                  ${MAIL_USER:-}
       MAIL_PASS:                  ${MAIL_PASS:-}
       ALERT_EMAIL:                ${ALERT_EMAIL:-admin@dolphin.ai}
@@ -102,8 +145,11 @@ services:
       META_ENCRYPTION_KEY:        ${META_ENCRYPTION_KEY:-dolphin_encryption_key_32chars_min_required!!}
       JWT_SECRET:                 ${JWT_SECRET:-DolphinAI_SuperSecretKey_2026_HS256_MinLength32BytesRequired!!}
       HF_TOKEN:                   ${HF_TOKEN:-}
+      STORAGE_BASE_DIR:           /app/storage
     ports:
       - "8000:8000"
+    volumes:
+      - backend_storage:/app/storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health"]
       interval: 30s
@@ -119,6 +165,21 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    ports:
+      - "4200:80"
+
+  # ── Edge Gateway (public entrypoint: SPA + API routing) ─────────
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: dolphin_gateway
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    volumes:
+      - ./infra/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "80:80"
 
@@ -147,6 +208,35 @@ services:
       postgres:
         condition: service_healthy
 
+  # ── Prometheus Metrics ─────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: dolphin_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ── Grafana Dashboards ─────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: dolphin_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-dolphin123}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
 # ── Volumes ────────────────────────────────────────────────────
 volumes:
   postgres_data:
@@ -154,4 +244,12 @@ volumes:
   ollama_data:
     driver: local
   n8n_data:
+    driver: local
+  minio_data:
+    driver: local
+  backend_storage:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local

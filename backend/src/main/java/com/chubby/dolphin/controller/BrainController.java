@@ -5,8 +5,11 @@ import com.chubby.dolphin.entity.BrainEvent;
 import com.chubby.dolphin.entity.Campaign;
 import com.chubby.dolphin.brain.BrainActionAuditService;
 import com.chubby.dolphin.repository.BrainEventRepository;
+import com.chubby.dolphin.repository.BrainDecisionRepository;
 import com.chubby.dolphin.repository.CampaignRepository;
 import com.chubby.dolphin.repository.WalletRepository;
+import com.chubby.dolphin.rbac.Permission;
+import com.chubby.dolphin.security.AccessControlService;
 import com.chubby.dolphin.security.SecurityUtils;
 import com.chubby.dolphin.service.BrainDecisionService;
 import com.chubby.dolphin.service.BusinessLlmFacadeService;
@@ -34,6 +37,7 @@ public class BrainController {
 
     private final CampaignRepository   campaignRepo;
     private final BrainEventRepository brainEventRepo;
+    private final BrainDecisionRepository brainDecisionRepo;
     private final WalletRepository     walletRepo;
     private final BusinessLlmFacadeService     llmRouter;
     private final BrainDecisionService brainDecisionService;
@@ -43,9 +47,11 @@ public class BrainController {
     private final CompetitorScraperService competitorScraper;
     private final com.chubby.dolphin.service.AdvantageExperimentService experimentService;
     private final BrainActionAuditService actionAuditService;
+    private final AccessControlService access;
 
     public BrainController(CampaignRepository campaignRepo,
                            BrainEventRepository brainEventRepo,
+                           BrainDecisionRepository brainDecisionRepo,
                            WalletRepository walletRepo,
                            BusinessLlmFacadeService llmRouter,
                            BrainDecisionService brainDecisionService,
@@ -54,9 +60,11 @@ public class BrainController {
                            ObjectMapper mapper,
                            CompetitorScraperService competitorScraper,
                            com.chubby.dolphin.service.AdvantageExperimentService experimentService,
-                           BrainActionAuditService actionAuditService) {
+                           BrainActionAuditService actionAuditService,
+                           AccessControlService access) {
         this.campaignRepo = campaignRepo;
         this.brainEventRepo = brainEventRepo;
+        this.brainDecisionRepo = brainDecisionRepo;
         this.walletRepo = walletRepo;
         this.llmRouter = llmRouter;
         this.brainDecisionService = brainDecisionService;
@@ -66,6 +74,7 @@ public class BrainController {
         this.competitorScraper = competitorScraper;
         this.experimentService = experimentService;
         this.actionAuditService = actionAuditService;
+        this.access = access;
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -75,23 +84,26 @@ public class BrainController {
     /** Recent brain events — authenticated user's events only */
     @GetMapping("/brain/events/recent")
     public ResponseEntity<?> recentEvents() {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         return ResponseEntity.ok(
-            brainEventRepo.findTop50ByAccountIdOrderByCreatedAtDesc(sec.currentAccountId())
+            brainEventRepo.findTop50ByAccountIdOrderByCreatedAtDesc(sec.currentWorkspaceId())
         );
     }
 
     @GetMapping("/brain/events")
     public ResponseEntity<?> allEvents() {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         return ResponseEntity.ok(
-            brainEventRepo.findByAccountIdOrderByCreatedAtDesc(sec.currentAccountId())
+            brainEventRepo.findByAccountIdOrderByCreatedAtDesc(sec.currentWorkspaceId())
         );
     }
 
     /** Business-facing AI action trail for the current workspace. No model/provider/token details are returned. */
     @GetMapping("/brain/actions")
     public ResponseEntity<?> recentAiActions() {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         return ResponseEntity.ok(
-                actionAuditService.recentAiActions(sec.currentAccountId()).stream()
+                actionAuditService.recentAiActions(sec.currentWorkspaceId()).stream()
                         .map(a -> Map.of(
                                 "id", a.getId(),
                                 "action", a.getAction(),
@@ -112,7 +124,8 @@ public class BrainController {
     /** Evaluate a campaign with AI Brain — creates a BrainDecision record */
     @PostMapping("/campaigns/{id}/evaluate")
     public ResponseEntity<?> evaluate(@PathVariable String id) {
-        Optional<Campaign> opt = campaignRepo.findById(id);
+        access.requireWorkspacePermission(Permission.CAMPAIGN_APPROVE_AI_ACTION);
+        Optional<Campaign> opt = campaignRepo.findByIdAndWorkspaceId(id, sec.currentWorkspaceId());
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
         Campaign campaign = opt.get();
@@ -137,15 +150,17 @@ public class BrainController {
     /** Get recent brain decisions */
     @GetMapping("/brain/decisions")
     public ResponseEntity<?> decisions() {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         return ResponseEntity.ok(
-            brainDecisionService.getRecentDecisions(sec.currentAccountId())
+            brainDecisionService.getRecentDecisions(sec.currentWorkspaceId())
         );
     }
 
     /** Get pending approvals */
     @GetMapping("/brain/decisions/pending")
     public ResponseEntity<?> pendingApprovals() {
-        String accountId = sec.currentAccountId();
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
+        String accountId = sec.currentWorkspaceId();
         return ResponseEntity.ok(Map.of(
             "pending", brainDecisionService.getPendingApprovals(accountId),
             "count", brainDecisionService.getPendingApprovalCount(accountId)
@@ -157,6 +172,10 @@ public class BrainController {
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<?> approveDecision(@PathVariable String id) {
         try {
+            access.requireWorkspacePermission(Permission.CAMPAIGN_APPROVE_AI_ACTION);
+            if (brainDecisionRepo.findByIdAndWorkspaceId(id, sec.currentWorkspaceId()).isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
             BrainDecision decision = brainDecisionService.approveDecision(id, sec.currentEmail());
             return ResponseEntity.ok(decision);
         } catch (Exception e) {
@@ -169,6 +188,10 @@ public class BrainController {
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<?> rejectDecision(@PathVariable String id) {
         try {
+            access.requireWorkspacePermission(Permission.CAMPAIGN_APPROVE_AI_ACTION);
+            if (brainDecisionRepo.findByIdAndWorkspaceId(id, sec.currentWorkspaceId()).isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
             BrainDecision decision = brainDecisionService.rejectDecision(id, sec.currentEmail());
             return ResponseEntity.ok(decision);
         } catch (Exception e) {
@@ -183,11 +206,8 @@ public class BrainController {
     /** Budget arbitrage with AI — uses authenticated account's campaigns */
     @PostMapping("/brain/arbitrage/{accountId}")
     public ResponseEntity<?> runArbitrage(@PathVariable String accountId) {
-        String activeWorkspaceId = sec.currentWorkspaceId();
-        org.springframework.security.core.Authentication auth = 
-            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
-        String targetAccountId = (isAdmin && accountId != null && !accountId.isBlank()) ? accountId : activeWorkspaceId;
+        access.requireWorkspacePermission(Permission.CAMPAIGN_METRICS_READ);
+        String targetAccountId = sec.currentWorkspaceId();
 
         List<Campaign> campaigns = campaignRepo.findByAccountId(targetAccountId);
         if (campaigns.isEmpty()) {
@@ -235,11 +255,8 @@ public class BrainController {
     /** EMAS analytics — computed from real campaign data */
     @GetMapping("/emas/{accountId}")
     public ResponseEntity<?> emas(@PathVariable String accountId) {
-        String activeWorkspaceId = sec.currentWorkspaceId();
-        org.springframework.security.core.Authentication auth = 
-            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
-        String targetAccountId = (isAdmin && accountId != null && !accountId.isBlank()) ? accountId : activeWorkspaceId;
+        access.requireWorkspacePermission(Permission.CAMPAIGN_METRICS_READ);
+        String targetAccountId = sec.currentWorkspaceId();
 
         List<Campaign> campaigns = campaignRepo.findByAccountId(targetAccountId);
         double totalSpend   = campaigns.stream().mapToDouble(c -> safe(c.getSpent())).sum();
@@ -266,6 +283,7 @@ public class BrainController {
     /** Get LLM provider health status */
     @GetMapping("/brain/llm-status")
     public ResponseEntity<?> llmStatus() {
+        access.requireWorkspacePermission(Permission.AI_PROVIDER_READ);
         return ResponseEntity.ok(llmRouter.getProviderStatus());
     }
 
@@ -276,11 +294,12 @@ public class BrainController {
     /** Crawl and analyze a competitor's website for digital marketing hooks */
     @PostMapping("/brain/competitor/analyze")
     public ResponseEntity<?> analyzeCompetitor(@RequestBody Map<String, String> body) {
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
         String url = body.get("competitor_url");
         if (url == null || url.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "competitor_url is required"));
         }
-        String accountId = sec.currentAccountId();
+        String accountId = sec.currentWorkspaceId();
         CompetitorInsight insight = competitorScraper.analyzeCompetitor(url, accountId);
         
         saveEvent(accountId, "COMPETITOR_SCRAPED", 
@@ -292,7 +311,8 @@ public class BrainController {
     /** List all stored competitor insights for the current account */
     @GetMapping("/brain/competitor/insights")
     public ResponseEntity<?> getCompetitorInsights() {
-        return ResponseEntity.ok(competitorScraper.getInsightsForAccount(sec.currentAccountId()));
+        access.requireWorkspacePermission(Permission.ANALYTICS_READ);
+        return ResponseEntity.ok(competitorScraper.getInsightsForAccount(sec.currentWorkspaceId()));
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -326,6 +346,10 @@ public class BrainController {
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<?> rollbackDecision(@PathVariable String id) {
         try {
+            access.requireWorkspacePermission(Permission.CAMPAIGN_APPROVE_AI_ACTION);
+            if (brainDecisionRepo.findByIdAndWorkspaceId(id, sec.currentWorkspaceId()).isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
             BrainDecision result = brainDecisionService.rollbackDecision(id);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
@@ -338,7 +362,8 @@ public class BrainController {
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','MANAGER')")
     public ResponseEntity<?> createAbExperiment(@RequestBody Map<String, Object> body) {
         try {
-            String workspaceId = sec.currentAccountId();
+            access.requireWorkspacePermission(Permission.CAMPAIGN_APPROVE_AI_ACTION);
+            String workspaceId = sec.currentWorkspaceId();
             String campaignId = (String) body.get("campaignId");
             List<String> headlines = (List<String>) body.get("headlines");
             List<String> bodies = (List<String>) body.get("bodies");
@@ -346,6 +371,9 @@ public class BrainController {
 
             if (campaignId == null || headlines == null || bodies == null || ctas == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "campaignId, headlines, bodies, and ctas are required."));
+            }
+            if (campaignRepo.findByIdAndWorkspaceId(campaignId, workspaceId).isEmpty()) {
+                return ResponseEntity.notFound().build();
             }
 
             com.chubby.dolphin.entity.AdvantageExperiment exp = experimentService.createAbExperiment(

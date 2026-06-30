@@ -1,97 +1,195 @@
-<div class="analytics-page">
-  <header class="analytics-header">
-    <div class="analytics-header__title-section">
+<div class="analytics-page page">
+  <header class="analytics-header page-header">
+    <div>
       <h1 class="analytics-title">Analytics</h1>
-      <p class="analytics-subtitle">EMAS enterprise metrics — Blended ROAS, CAC, MER</p>
+      <p class="analytics-subtitle">See what happened, what matters, and where revenue can grow next.</p>
     </div>
-    <div class="analytics-actions">
+    <div class="analytics-actions action-row">
       <span *ngIf="message()" class="analytics-message"
-            [style.color]="message().startsWith('✅') ? 'var(--success)' : 'var(--danger)'">
+            style="color: var(--danger)">
         {{ message() }}
       </span>
-      <button class="btn btn-primary" (click)="runArbitrage()" [disabled]="running()">
-        <span *ngIf="running()">⚙️ Running…</span>
-        <span *ngIf="!running()">⚡ Run Arbitrage</span>
-      </button>
-      <button class="btn btn-ghost" (click)="load()">↺</button>
+      <button class="btn btn-ghost" (click)="load()">Refresh</button>
     </div>
   </header>
 
   <ng-container *ngIf="loading()">
-    <div class="stats-grid">
+    <div class="premium-grid">
       <div *ngFor="let _ of [1,2,3,4,5]" class="skeleton-card"></div>
     </div>
   </ng-container>
 
-  <ng-container *ngIf="!loading() && metrics() as m">
-    <!-- Top KPI cards using UiPanel components -->
-    <div class="stats-grid">
-      
-      <ui-panel title="Blended ROAS" elevation="surface" padding="16px">
-        <div class="kpi-content">
-          <div class="metric-val" [style.color]="roasHealth(m.blended_roas)">{{ m.blended_roas | number:'1.2-2' }}x</div>
-          <div class="emas-hint">Target: ≥ 3.0x</div>
-          <div class="emas-bar-track">
-            <div class="emas-bar-fill" [style.width.%]="(m.blended_roas / 5) * 100" [style.background]="roasHealth(m.blended_roas)"></div>
-          </div>
-        </div>
-      </ui-panel>
-
-      <ui-panel title="CAC" elevation="surface" padding="16px">
-        <div class="kpi-content">
-          <div class="metric-val">₹{{ m.cac | number:'1.0-0' }}</div>
-          <div class="emas-hint">Cost per new customer</div>
-        </div>
-      </ui-panel>
-
-      <ui-panel title="MER" elevation="surface" padding="16px">
-        <div class="kpi-content">
-          <div class="metric-val" [style.color]="merHealth(m.mer)">{{ m.mer | number:'1.2-2' }}x</div>
-          <div class="emas-hint">Marketing Efficiency Ratio</div>
-          <div class="emas-bar-track">
-            <div class="emas-bar-fill" [style.width.%]="(m.mer / 6) * 100" [style.background]="merHealth(m.mer)"></div>
-          </div>
-        </div>
-      </ui-panel>
-
-      <ui-panel title="Total Spend" elevation="surface" padding="16px">
-        <div class="kpi-content">
-          <div class="metric-val">₹{{ m.total_spend | number:'1.0-0' }}</div>
-          <div class="emas-hint">All campaigns combined</div>
-        </div>
-      </ui-panel>
-
-      <ui-panel title="Total Revenue" elevation="surface" padding="16px">
-        <div class="kpi-content">
-          <div class="metric-val" style="color:var(--success)">₹{{ m.total_revenue | number:'1.0-0' }}</div>
-          <div class="emas-hint">Attributed to ads</div>
-        </div>
-      </ui-panel>
-
+  <ng-container *ngIf="!loading() && summary() as s">
+    <div class="analytics-truth-strip">
+      <span>{{ s.read_only ? 'Read-only analytics' : 'Write access detected' }}</span>
+      <span>Workspace scoped</span>
+      <span>{{ s.empty_state.message }}</span>
     </div>
 
-    <!-- Summary row panel -->
-    <ui-panel title="Marketing Summary Insights" elevation="elevated">
-      <div class="emas-summary">
-        <div class="emas-summary__item">
-          <div class="metric-label">Total Customers</div>
-          <div class="summary-val text-accent">{{ m.total_customers }}</div>
+    <div class="analytics-grid">
+      <section class="analytics-panel">
+        <div>
+          <div class="analytics-panel__eyebrow">{{ sectionState(s.campaign_summary.empty) }}</div>
+          <h2>Campaign summary</h2>
         </div>
-        <div class="emas-summary__divider"></div>
-        <div class="emas-summary__item">
-          <div class="metric-label">Blended Profit</div>
-          <div class="summary-val" [style.color]="(m.total_revenue - m.total_spend) >= 0 ? 'var(--success)' : 'var(--danger)'">
-            ₹{{ (m.total_revenue - m.total_spend) | number:'1.0-0' }}
-          </div>
+        <div class="metric-row">
+          <span>Total</span>
+          <strong>{{ s.campaign_summary.total }}</strong>
         </div>
-        <div class="emas-summary__divider"></div>
-        <div class="emas-summary__item">
-          <div class="metric-label">Spend / Revenue Ratio</div>
-          <div class="summary-val text-warn">
-            {{ (m.total_spend / m.total_revenue * 100) | number:'1.0-0' }}%
-          </div>
+        <div class="metric-row">
+          <span>Active</span>
+          <strong>{{ s.campaign_summary.active }}</strong>
         </div>
-      </div>
-    </ui-panel>
+        <div class="metric-row">
+          <span>Budget</span>
+          <strong>₹{{ s.campaign_summary.total_budget | number:'1.0-0' }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Spend</span>
+          <strong>₹{{ s.campaign_summary.total_spend | number:'1.0-0' }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Avg ROAS</span>
+          <strong [style.color]="roasHealth(s.campaign_summary.average_roas)">
+            {{ s.campaign_summary.average_roas | number:'1.2-2' }}x
+          </strong>
+        </div>
+        <footer>Source: {{ s.campaign_summary.source_table }}</footer>
+      </section>
+
+      <section class="analytics-panel">
+        <div>
+          <div class="analytics-panel__eyebrow">{{ sectionState(s.lead_summary.empty) }}</div>
+          <h2>Lead summary</h2>
+        </div>
+        <div class="metric-row">
+          <span>Total</span>
+          <strong>{{ s.lead_summary.total }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>New</span>
+          <strong>{{ s.lead_summary.new_leads }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Hot / Warm / Cold</span>
+          <strong>{{ s.lead_summary.hot }} / {{ s.lead_summary.warm }} / {{ s.lead_summary.cold }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Unknown temperature</span>
+          <strong>{{ s.lead_summary.unknown_temperature }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Avg score</span>
+          <strong>{{ s.lead_summary.average_score | number:'1.2-2' }}</strong>
+        </div>
+        <footer>Source: {{ s.lead_summary.source_table }}</footer>
+      </section>
+
+      <section class="analytics-panel">
+        <div>
+          <div class="analytics-panel__eyebrow">{{ sectionState(s.approval_summary.empty) }}</div>
+          <h2>Approval summary</h2>
+        </div>
+        <div class="metric-row">
+          <span>Total</span>
+          <strong>{{ s.approval_summary.total }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Pending</span>
+          <strong [style.color]="approvalHealth(s.approval_summary.pending)">{{ s.approval_summary.pending }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Approved / Rejected</span>
+          <strong>{{ s.approval_summary.approved }} / {{ s.approval_summary.rejected }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Requires execution</span>
+          <strong>{{ s.approval_summary.requires_execution }}</strong>
+        </div>
+        <footer>Source: {{ s.approval_summary.source_table }}</footer>
+      </section>
+
+      <section class="analytics-panel">
+        <div>
+          <div class="analytics-panel__eyebrow">{{ sectionState(s.content_factory_summary.empty) }}</div>
+          <h2>Content Factory summary</h2>
+        </div>
+        <div class="metric-row">
+          <span>Items</span>
+          <strong>{{ s.content_factory_summary.items }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Variants</span>
+          <strong>{{ s.content_factory_summary.variants }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Draft / Submitted / Approved</span>
+          <strong>{{ s.content_factory_summary.draft_variants }} / {{ s.content_factory_summary.submitted_variants }} / {{ s.content_factory_summary.approved_variants }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Avg score</span>
+          <strong>{{ s.content_factory_summary.average_score | number:'1.0-2' }}</strong>
+        </div>
+        <footer>Sources: {{ s.content_factory_summary.source_tables.join(', ') }}</footer>
+      </section>
+
+      <section class="analytics-panel">
+        <div>
+          <div class="analytics-panel__eyebrow">{{ sectionState(s.ad_brain_summary.empty) }}</div>
+          <h2>Ad Brain run summary</h2>
+        </div>
+        <div class="metric-row">
+          <span>Runs</span>
+          <strong>{{ s.ad_brain_summary.runs }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Campaigns evaluated</span>
+          <strong>{{ s.ad_brain_summary.campaigns_evaluated }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Approvals created</span>
+          <strong>{{ s.ad_brain_summary.approvals_created }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Risks / Opportunities</span>
+          <strong>{{ s.ad_brain_summary.risks_created }} / {{ s.ad_brain_summary.opportunities_created }}</strong>
+        </div>
+        <footer>Source: {{ s.ad_brain_summary.source_table }}</footer>
+      </section>
+
+      <section class="analytics-panel">
+        <div>
+          <div class="analytics-panel__eyebrow">{{ sectionState(s.risk_opportunity_summary.empty) }}</div>
+          <h2>Risk and opportunity summary</h2>
+        </div>
+        <div class="metric-row">
+          <span>Math evaluations</span>
+          <strong>{{ s.risk_opportunity_summary.math_evaluations }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Requires approval</span>
+          <strong>{{ s.risk_opportunity_summary.requires_approval }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Critical / High</span>
+          <strong>{{ s.risk_opportunity_summary.critical }} / {{ s.risk_opportunity_summary.high }}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Not enough data</span>
+          <strong>{{ s.risk_opportunity_summary.not_enough_data }}</strong>
+        </div>
+        <footer>Source: {{ s.risk_opportunity_summary.source_table }}</footer>
+      </section>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="!loading() && !summary()">
+    <div class="analytics-empty">
+      <h2>No analytics data loaded</h2>
+      <p>
+        Analytics could not be fetched from the backend. No fallback numbers are shown.
+      </p>
+      <p *ngIf="message()" class="analytics-empty__error">{{ message() }}</p>
+    </div>
   </ng-container>
 </div>

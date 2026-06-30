@@ -1,1 +1,69 @@
-/* app.scss — global host styles handled in styles.scss */
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.app-health {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(124, 58, 237, 0.16), transparent 32%),
+    radial-gradient(circle at 78% 18%, rgba(37, 99, 235, 0.13), transparent 30%),
+    linear-gradient(135deg, var(--bg-primary), var(--bg-surface));
+}
+
+.app-health__panel {
+  width: min(560px, 100%);
+  padding: 42px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+  box-shadow: 0 28px 90px rgba(29, 29, 31, 0.14);
+  backdrop-filter: blur(28px);
+  text-align: center;
+}
+
+.app-health__mark {
+  display: inline-flex;
+  margin-bottom: 18px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--accent-light);
+}
+
+.app-health h1 {
+  margin: 0;
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.app-health p {
+  margin: 16px auto 26px;
+  max-width: 440px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.app-health__message {
+  display: block;
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.app-health__loader {
+  width: 44px;
+  height: 44px;
+  margin: 24px auto 0;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

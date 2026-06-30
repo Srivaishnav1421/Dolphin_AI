@@ -38,6 +38,7 @@ public class BrainDecisionService {
     private final CreativeFatigueService creativeFatigueService;
     private final WorkspaceConfigRepository workspaceConfigRepo;
     private final BrainDecisionHistoryRepository historyRepo;
+    private final LocalApprovalSafetyService localApprovalSafetyService;
 
     // Optional dependencies for resilience during tests
     private final RabbitTemplate rabbitTemplate;
@@ -77,6 +78,29 @@ public class BrainDecisionService {
                                  BrainDecisionHistoryRepository historyRepo,
                                  @Autowired(required = false) RabbitTemplate rabbitTemplate,
                                  @Autowired(required = false) MeterRegistry meterRegistry) {
+        this(campaignRepo, decisionRepo, eventRepo, metaConnRepo, llmRouter, safetyEngine,
+                metaAdsService, alertService, mapper, brainFeedbackService, wsTemplate,
+                creativeFatigueService, workspaceConfigRepo, historyRepo, rabbitTemplate, meterRegistry, null);
+    }
+
+    @Autowired
+    public BrainDecisionService(CampaignRepository campaignRepo,
+                                 BrainDecisionRepository decisionRepo,
+                                 BrainEventRepository eventRepo,
+                                 MetaConnectionRepository metaConnRepo,
+                                 BusinessLlmFacadeService llmRouter,
+                                 SafetyRulesEngine safetyEngine,
+                                 MetaAdsService metaAdsService,
+                                 AlertService alertService,
+                                 ObjectMapper mapper,
+                                 BrainFeedbackService brainFeedbackService,
+                                 SimpMessagingTemplate wsTemplate,
+                                 CreativeFatigueService creativeFatigueService,
+                                 WorkspaceConfigRepository workspaceConfigRepo,
+                                 BrainDecisionHistoryRepository historyRepo,
+                                 @Autowired(required = false) RabbitTemplate rabbitTemplate,
+                                 @Autowired(required = false) MeterRegistry meterRegistry,
+                                 @Autowired(required = false) LocalApprovalSafetyService localApprovalSafetyService) {
         this.campaignRepo = campaignRepo;
         this.decisionRepo = decisionRepo;
         this.eventRepo = eventRepo;
@@ -93,6 +117,7 @@ public class BrainDecisionService {
         this.historyRepo = historyRepo;
         this.rabbitTemplate = rabbitTemplate;
         this.meterRegistry = meterRegistry;
+        this.localApprovalSafetyService = localApprovalSafetyService;
 
         // Initialize micrometer metrics with fallbacks
         if (meterRegistry != null) {
@@ -242,26 +267,17 @@ public class BrainDecisionService {
             decision.setBudgetAfter(campaign.getBudget() * multiplier);
         }
 
-        // 4. Apply Human Approval Layer settings
-        if (!autoOptimize) {
-            decision.setStatus("PENDING_APPROVAL");
-            log.info("Approval Required: workspace auto-optimization is disabled.");
+        // Local approval-first mode: risky campaign actions are never auto-executed.
+        decision.setStatus("PENDING_APPROVAL");
+        if (autoOptimize && confidence >= autoExecuteThreshold) {
+            decision.setReason(decision.getReason() + " [Auto-optimization requested, but local approval-first mode disabled execution.]");
+            log.info("Auto-execution suppressed. Decision stored for approval.");
         } else {
-            if (confidence >= autoExecuteThreshold) {
-                decision.setStatus("QUEUED");
-                log.info("Auto-Execute queued via RabbitMQ: workspace auto-optimization enabled.");
-            } else {
-                decision.setStatus("PENDING_APPROVAL");
-            }
+            log.info("Approval required before any risky campaign action.");
         }
 
         BrainDecision saved = decisionRepo.save(decision);
         saveHistory(saved, snapshotJson, triggerMetricsStr, breachedThresholdStr);
-
-        // Dispatch automatically if status is QUEUED
-        if ("QUEUED".equals(saved.getStatus())) {
-            queueDecisionMessage(saved);
-        }
 
         // Trigger real-time ws event
         try {
@@ -352,7 +368,8 @@ public class BrainDecisionService {
         decision.setStatus("APPROVED");
 
         BrainDecision saved = decisionRepo.save(decision);
-        queueDecisionMessage(saved);
+        saveEvent(decision.getAccountId(), "DECISION_APPROVED",
+                "Decision approved for '" + decision.getCampaignName() + "'. Execution is disabled in local approval-first mode.", "INFO");
         return saved;
     }
 
@@ -380,6 +397,21 @@ public class BrainDecisionService {
 
     private void executeDecision(BrainDecision decision, Campaign campaign) {
         String accountId = decision.getAccountId();
+        if (localSafetyBlocks("BRAIN_DECISION_EXECUTION")) {
+            decision.setStatus("PENDING_APPROVAL");
+            decision.setReason(decision.getReason() + " [Blocked by local approval-first safety gate; execution requires approval and external integration is disabled.]");
+            localApprovalSafetyService.auditBlockedExecution(
+                    accountId,
+                    "BRAIN_DECISION_EXECUTION",
+                    "BrainDecision",
+                    decision.getId(),
+                    "Legacy Brain execution blocked before Meta pause/resume/budget mutation."
+            );
+            saveEvent(accountId, "LOCAL_SAFETY_BLOCKED",
+                    "Legacy Brain execution blocked for '" + decision.getCampaignName() + "'. Approval-first local mode is active.",
+                    "WARNING");
+            return;
+        }
 
         // Safety pre-flight check
         Optional<MetaConnection> connOpt = metaAdsService.getActiveConnection(accountId);
@@ -499,6 +531,16 @@ public class BrainDecisionService {
     @Scheduled(fixedDelayString = "${brain.cycle.interval-ms:900000}")
     public void autonomousBrainCycle() {
         log.info("🧠 Autonomous Brain Cycle started...");
+        if (localSafetyBlocks("BRAIN_AUTONOMOUS_CYCLE")) {
+            localApprovalSafetyService.auditBlockedExecution(
+                    null,
+                    "BRAIN_AUTONOMOUS_CYCLE",
+                    "Campaign",
+                    null,
+                    "Scheduled legacy Brain cycle blocked before campaign evaluation or mutation."
+            );
+            return;
+        }
 
         List<Campaign> allActive = campaignRepo.findByStatus("ACTIVE");
         int evaluated = 0;
@@ -511,14 +553,10 @@ public class BrainDecisionService {
                     continue;
                 }
 
-                // Emergency wallet sweep
+                // Emergency wallet sweep: local approval-first mode records a critical warning only.
                 if (safetyEngine.isEmergencyPauseNeeded(campaign.getAccountId())) {
-                    campaign.setStatus("PAUSED");
-                    campaign.setUpdatedAt(LocalDateTime.now());
-                    campaignRepo.save(campaign);
                     saveEvent(campaign.getAccountId(), "EMERGENCY_PAUSE",
-                            "🚨 Emergency pause: '" + campaign.getName() + "' — low wallet balance", "CRITICAL");
-                    actioned++;
+                            "Emergency pause recommended for '" + campaign.getName() + "' due to low wallet balance. Approval required before action.", "CRITICAL");
                     continue;
                 }
 
@@ -568,5 +606,9 @@ public class BrainDecisionService {
     private Double toDouble(Object v, Double def) {
         if (v == null) return def;
         try { return Double.parseDouble(v.toString()); } catch (Exception e) { return def; }
+    }
+
+    private boolean localSafetyBlocks(String action) {
+        return localApprovalSafetyService != null && localApprovalSafetyService.shouldRequireApprovalOnly(action);
     }
 }

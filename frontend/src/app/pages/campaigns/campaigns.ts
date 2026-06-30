@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
-import { Campaign, AdCreative, BrainDecision } from '../../shared/models';
+import { Campaign, AdCreative, BrainDecision, CampaignMathEvaluation } from '../../shared/models';
 
 @Component({
   selector: 'app-campaigns',
@@ -18,6 +18,7 @@ export class Campaigns implements OnInit {
   saving            = signal(false);
   message           = signal('');
   showForm          = signal(false);
+  mathScores        = signal<Record<string, CampaignMathEvaluation>>({});
 
   // Inspector panel
   selected          = signal<Campaign | null>(null);
@@ -29,11 +30,13 @@ export class Campaigns implements OnInit {
   form = {
     name: '',
     objective: 'LEADS',
-    budget: 0,
-    ctr: 0,
-    cpl: 0,
-    roas: 0,
-    spent: 0,
+    budget: null as number | null,
+    target_cpl: null as number | null,
+    description: '',
+    ctr: null as number | null,
+    cpl: null as number | null,
+    roas: null as number | null,
+    spent: null as number | null,
   };
 
   objectives = ['LEADS', 'CONVERSIONS', 'AWARENESS', 'TRAFFIC'];
@@ -45,8 +48,28 @@ export class Campaigns implements OnInit {
   load() {
     this.loading.set(true);
     this.api.getCampaigns().subscribe({
-      next: c => { this.campaigns.set(c); this.loading.set(false); },
-      error: () => this.loading.set(false),
+      next: c => {
+        this.campaigns.set(c);
+        this.loading.set(false);
+        this.loadMathScores(c);
+      },
+      error: () => {
+        this.message.set('Could not load campaigns. Check backend and database connection.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  loadMathScores(campaigns = this.campaigns()) {
+    const scores: Record<string, CampaignMathEvaluation> = {};
+    this.mathScores.set(scores);
+    campaigns.forEach(campaign => {
+      this.api.getCampaignMathScore(campaign.id).subscribe({
+        next: score => this.mathScores.update(current => ({ ...current, [campaign.id]: score })),
+        error: () => {
+          // No score yet is a valid state before the Math Engine has evaluated this campaign.
+        }
+      });
     });
   }
 
@@ -69,7 +92,9 @@ export class Campaigns implements OnInit {
       next: list => {
         this.creatives.set(list.filter(x => x.campaign_id === c.id));
       },
-      error: () => {}
+      error: () => {
+        this.message.set('Could not load campaign creatives from the database.');
+      }
     });
 
     // Load recommendations
@@ -77,7 +102,9 @@ export class Campaigns implements OnInit {
       next: recs => {
         this.recommendations.set(recs.filter(r => r.campaign_id === c.id || r.campaign_name === c.name));
       },
-      error: () => {}
+      error: () => {
+        this.message.set('Could not load campaign recommendations from the database.');
+      }
     });
   }
 
@@ -99,15 +126,25 @@ export class Campaigns implements OnInit {
   }
 
   openForm() {
-    this.form = { name: '', objective: 'LEADS', budget: 0, ctr: 0, cpl: 0, roas: 0, spent: 0 };
+    this.form = {
+      name: '',
+      objective: 'LEADS',
+      budget: null,
+      target_cpl: null,
+      description: '',
+      ctr: null,
+      cpl: null,
+      roas: null,
+      spent: null
+    };
     this.showForm.set(true);
   }
 
   closeForm() { this.showForm.set(false); }
 
   createCampaign() {
-    if (!this.form.name || !this.form.budget) {
-      this.message.set('⚠️ Campaign name and budget are required.');
+    if (!this.form.name || !this.form.budget || !this.form.target_cpl) {
+      this.message.set('⚠️ Campaign name, budget, and target CPL are required.');
       return;
     }
     this.saving.set(true);
@@ -146,18 +183,63 @@ export class Campaigns implements OnInit {
     this.api.deleteCampaign(id).subscribe(() => this.load());
   }
 
+  latestMathScore(campaign: Campaign): CampaignMathEvaluation | null {
+    return this.mathScores()[campaign.id] ?? null;
+  }
+
+  scoreValue(campaign: Campaign): number | null {
+    const score = this.latestMathScore(campaign)?.score;
+    return typeof score === 'number' ? score : null;
+  }
+
+  scoreLabel(campaign: Campaign): string {
+    const score = this.scoreValue(campaign);
+    return score === null ? 'No score yet' : score.toFixed(1);
+  }
+
   scoreColor(score: number | null): string {
-    if (!score) return 'var(--text-muted)';
+    if (score === null) return 'var(--text-muted)';
     if (score >= 70) return 'var(--success)';
     if (score >= 40) return 'var(--warning)';
     return 'var(--danger)';
   }
 
-  getHealth(score: number): { label: string, color: string } {
-    if (!score) return { label: 'HEALTHY', color: 'var(--success)' };
+  getHealth(score: number | null): { label: string, color: string } {
+    if (score === null) return { label: 'NO SCORE YET', color: 'var(--text-muted)' };
     if (score >= 75) return { label: 'HEALTHY', color: 'var(--success)' };
     if (score >= 50) return { label: 'WATCHLIST', color: 'var(--warning)' };
     if (score >= 30) return { label: 'RISK', color: 'var(--orange)' };
     return { label: 'CRITICAL', color: 'var(--danger)' };
+  }
+
+  scoreSnapshot(campaign: Campaign): any {
+    const raw = this.latestMathScore(campaign)?.input_snapshot_json;
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  scoreBreakdown(campaign: Campaign): Record<string, number> | null {
+    return this.scoreSnapshot(campaign)?.scoreBreakdown ?? null;
+  }
+
+  scoreExplanation(campaign: Campaign): string[] {
+    const explanation = this.scoreSnapshot(campaign)?.explanation;
+    return Array.isArray(explanation) ? explanation : [];
+  }
+
+  moneyValue(value: number | null | undefined): string {
+    return typeof value === 'number' ? `₹${Math.round(value).toLocaleString('en-IN')}` : 'No data yet';
+  }
+
+  percentValue(value: number | null | undefined): string {
+    return typeof value === 'number' ? `${value.toFixed(2)}%` : 'No actual CTR yet';
+  }
+
+  multiplierValue(value: number | null | undefined): string {
+    return typeof value === 'number' ? `${value.toFixed(2)}x` : 'No ROAS yet';
   }
 }

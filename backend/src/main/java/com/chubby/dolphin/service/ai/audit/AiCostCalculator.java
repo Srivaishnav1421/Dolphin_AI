@@ -15,6 +15,21 @@ public class AiCostCalculator {
         }
         return switch (provider) {
             case OLLAMA, MOCK -> 0.0;
+            case OPENAI -> {
+                double inputCost = (promptTokens * 0.40) / 1_000_000.0;
+                double outputCost = (completionTokens * 1.60) / 1_000_000.0;
+                yield inputCost + outputCost;
+            }
+            case GEMINI -> {
+                double inputCost = (promptTokens * 0.075) / 1_000_000.0;
+                double outputCost = (completionTokens * 0.30) / 1_000_000.0;
+                yield inputCost + outputCost;
+            }
+            case ANTHROPIC -> {
+                double inputCost = (promptTokens * 3.00) / 1_000_000.0;
+                double outputCost = (completionTokens * 15.00) / 1_000_000.0;
+                yield inputCost + outputCost;
+            }
             case HUGGINGFACE -> {
                 double inputCost = (promptTokens * 3.50) / 1_000_000.0;
                 double outputCost = (completionTokens * 10.50) / 1_000_000.0;

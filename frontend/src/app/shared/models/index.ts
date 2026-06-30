@@ -8,6 +8,18 @@ export interface User {
   name: string;
   role: string;
   account_id: string;
+  organization_id?: string;
+  two_factor_enabled?: boolean;
+  workspaces?: WorkspaceOption[];
+}
+
+export interface WorkspaceOption {
+  id: string;
+  name: string;
+  role?: string;
+  active?: boolean;
+  organization_id?: string;
+  created_at?: string;
 }
 
 export interface AuthResponse {
@@ -24,11 +36,13 @@ export interface Campaign {
   status:            'ACTIVE' | 'PAUSED' | 'COMPLETED';
   objective:         'LEADS' | 'CONVERSIONS' | 'AWARENESS' | 'TRAFFIC';
   budget:            number;
-  spent:             number;
-  ctr:               number;
-  cpl:               number;
-  roas:              number;
-  performance_score: number;
+  target_cpl?:       number | null;
+  spent:             number | null;
+  ctr:               number | null;
+  cpl:               number | null;
+  roas:              number | null;
+  performance_score: number | null;
+  description?:      string | null;
   account_id:        string;
   meta_campaign_id?: string;
   created_at:        string;
@@ -42,7 +56,8 @@ export interface Lead {
   email?:           string;
   message:          string;
   score:            number;
-  status:           'HOT' | 'WARM' | 'COLD' | 'UNQUALIFIABLE';
+  status:           'NEW' | 'CONTACTED' | 'QUALIFIED' | 'WON' | 'LOST';
+  temperature?:     'HOT' | 'WARM' | 'COLD' | 'UNKNOWN';
   pipeline_stage?:  'NEW_LEAD' | 'CONTACTED' | 'QUALIFIED' | 'INTERESTED' | 'PROPOSAL_SENT' | 'FOLLOW_UP' | 'NEGOTIATION' | 'CONVERTED' | 'LOST' | 'DORMANT' | 'RECYCLED';
   priority?:        'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   budget_signal:    string | null;
@@ -65,6 +80,7 @@ export interface Lead {
   ai_summary?:      string;
   next_best_action?: string;
   gemini_analysis?: string;
+  score_breakdown_json?: string;
   created_at:       string;
 }
 
@@ -90,6 +106,81 @@ export interface EmasMetrics {
   total_spend:     number;
   total_revenue:   number;
   total_customers: number;
+}
+
+export interface AnalyticsSummary {
+  workspace_id: string;
+  generated_at: string;
+  campaign_summary: {
+    total: number;
+    active: number;
+    paused: number;
+    completed: number;
+    total_budget: number;
+    total_spend: number;
+    recorded_attributed_revenue: number;
+    average_roas: number;
+    average_cpl: number;
+    source_table: string;
+    empty: boolean;
+  };
+  lead_summary: {
+    total: number;
+    new_leads: number;
+    hot: number;
+    warm: number;
+    cold: number;
+    unknown_temperature: number;
+    average_score: number;
+    source_table: string;
+    empty: boolean;
+  };
+  approval_summary: {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+    requires_execution: number;
+    source_table: string;
+    empty: boolean;
+  };
+  content_factory_summary: {
+    items: number;
+    variants: number;
+    draft_variants: number;
+    submitted_variants: number;
+    approved_variants: number;
+    average_score: number;
+    source_tables: string[];
+    empty: boolean;
+  };
+  ad_brain_summary: {
+    runs: number;
+    latest_run_at?: string | null;
+    campaigns_evaluated: number;
+    evaluations_created: number;
+    approvals_created: number;
+    duplicate_approvals_skipped: number;
+    risks_created: number;
+    opportunities_created: number;
+    source_table: string;
+    empty: boolean;
+  };
+  risk_opportunity_summary: {
+    math_evaluations: number;
+    requires_approval: number;
+    critical: number;
+    high: number;
+    not_enough_data: number;
+    latest_evaluation_at?: string | null;
+    source_table: string;
+    empty: boolean;
+  };
+  empty_state: {
+    is_empty: boolean;
+    message: string;
+  };
+  read_only: boolean;
 }
 
 export interface BrainEvent {
@@ -154,6 +245,84 @@ export interface BrainDecision {
   campaign_snapshot_json?: string;
 }
 
+export interface ApprovalItem {
+  id: string;
+  organization_id?: string | null;
+  workspace_id?: string | null;
+  account_id?: string | null;
+  source_module: 'AD_BRAIN' | 'CONTENT_FACTORY' | 'CAMPAIGN' | 'CREATIVE_STUDIO' | 'CRM' | 'AUTOMATION' | 'INTEGRATION' | 'SYSTEM' | string;
+  source_entity_type?: string | null;
+  source_entity_id?: string | null;
+  action_type: 'PAUSE_CAMPAIGN' | 'RESUME_CAMPAIGN' | 'KILL_CAMPAIGN' | 'CHANGE_BUDGET' | 'CHANGE_OBJECTIVE' | 'APPROVE_CREATIVE' | 'PUBLISH_CREATIVE' | 'LAUNCH_CREATIVE' | 'SEND_WHATSAPP' | 'CALL_LEAD' | 'CHANGE_LEAD_STATUS' | 'EXECUTE_WORKFLOW' | 'OTHER' | string;
+  title: string;
+  description?: string | null;
+  recommendation_json?: string | null;
+  math_snapshot_json?: string | null;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'EXECUTED' | 'FAILED';
+  requires_execution: boolean;
+  execution_status?: string | null;
+  execution_result_json?: string | null;
+  rejection_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+  executed_at?: string | null;
+  expires_at?: string | null;
+  execution_available: boolean;
+}
+
+export interface AdBrainRunResult {
+  run_id: string;
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED';
+  campaigns_evaluated: number;
+  evaluations_created: number;
+  approval_items_created: number;
+  duplicate_approvals_skipped: number;
+  risks_created: number;
+  opportunities_created: number;
+  started_at: string;
+  completed_at?: string | null;
+  error_message?: string | null;
+  message: string;
+}
+
+export interface AdBrainSignal {
+  id: string;
+  campaign_id?: string | null;
+  evaluation_type: string;
+  status: string;
+  severity: 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  action_type: string;
+  score?: number | null;
+  title: string;
+  description?: string | null;
+  formula_version: string;
+  requires_approval: boolean;
+  created_at: string;
+}
+
+export interface CampaignMathEvaluation {
+  id: string;
+  organization_id?: string | null;
+  workspace_id?: string | null;
+  account_id?: string | null;
+  campaign_id?: string | null;
+  run_id?: string | null;
+  evaluation_type: string;
+  status: 'OK' | 'NOT_ENOUGH_DATA' | string;
+  severity: 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  action_type: string;
+  score?: number | null;
+  title: string;
+  description?: string | null;
+  input_snapshot_json?: string | null;
+  formula_version: string;
+  requires_approval: boolean;
+  created_at: string;
+}
+
 export interface AdCreative {
   id:                string;
   account_id:        string;
@@ -174,6 +343,64 @@ export interface AdCreative {
   created_at:        string;
 }
 
+export type ContentFactoryGenerationMode = 'AI_GENERATED' | 'TEMPLATE_GENERATED';
+export type ContentFactoryApprovalStatus = 'DRAFT' | 'SUBMITTED_FOR_APPROVAL' | 'APPROVED' | 'REJECTED';
+export type ContentFactoryTone = 'FORMAL' | 'CASUAL' | 'BOLD' | 'FRIENDLY';
+export type ContentFactoryContentType = 'META_AD_COPY' | 'INSTAGRAM_POST' | 'WHATSAPP_MESSAGE' | 'REEL_SCRIPT' | 'LANDING_PAGE_HEADLINE';
+
+export interface ContentFactoryScoreBreakdown {
+  length_score: number;
+  power_word_score: number;
+  urgency_score: number;
+  emoji_score: number;
+  clarity_score: number;
+  score: number;
+  formula_version: string;
+}
+
+export interface ContentFactoryVariant {
+  id: string;
+  item_id: string;
+  variant_index: number;
+  headline?: string | null;
+  description?: string | null;
+  cta?: string | null;
+  content_text: string;
+  generation_mode: ContentFactoryGenerationMode;
+  score: number;
+  score_breakdown_json: string;
+  approval_status: ContentFactoryApprovalStatus;
+  approval_item_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+}
+
+export interface ContentFactoryItem {
+  id: string;
+  organization_id?: string | null;
+  workspace_id: string;
+  account_id: string;
+  created_by?: string | null;
+  content_type: ContentFactoryContentType;
+  business_name: string;
+  product_service: string;
+  target_audience: string;
+  location?: string | null;
+  offer?: string | null;
+  tone: ContentFactoryTone;
+  language?: string | null;
+  channel: string;
+  goal?: string | null;
+  cta_style?: string | null;
+  generation_mode: ContentFactoryGenerationMode;
+  input_request_json?: string | null;
+  variants: ContentFactoryVariant[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LlmProviderStatus {
   ollama: {
     enabled:   boolean;
@@ -189,6 +416,7 @@ export interface LlmProviderStatus {
 
 export interface DashboardSummary {
   total_spend:       number;
+  total_campaign_budget?: number;
   total_revenue:     number;
   blended_roas:      number;
   active_campaigns:  number;
@@ -199,6 +427,12 @@ export interface DashboardSummary {
   wallet_balance:    number;
   meta_connected:    boolean;
   pending_approvals: number;
+  automation?: {
+    active:              number;
+    completed:           number;
+    failed:              number;
+    average_duration_ms: number;
+  };
   llm_status:        LlmProviderStatus;
   recent_events:     BrainEvent[];
   // computed helpers

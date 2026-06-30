@@ -78,7 +78,7 @@ export interface GraphEdge {
     </div>
   `,
   styles: [`
-    @import '../../../styles/design-tokens.scss';
+    @use '../../../styles/design-tokens.scss' as *;
 
     .graph-viewport {
       width: 100%;

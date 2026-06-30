@@ -26,6 +26,9 @@ public class AuditLog {
     @Column(name = "workspace_id", length = 36)
     private String workspaceId;
 
+    @Column(name = "organization_id", length = 36)
+    private String organizationId;
+
     @Column(name = "correlation_id", length = 256)
     private String correlationId;
 
@@ -78,6 +81,9 @@ public class AuditLog {
 
     public String getWorkspaceId() { return workspaceId; }
     public void setWorkspaceId(String workspaceId) { this.workspaceId = workspaceId; }
+
+    public String getOrganizationId() { return organizationId; }
+    public void setOrganizationId(String organizationId) { this.organizationId = organizationId; }
 
     public String getCorrelationId() { return correlationId; }
     public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }

@@ -5,6 +5,7 @@ import com.chubby.dolphin.entity.Campaign;
 import com.chubby.dolphin.repository.AuditLogRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import org.hibernate.Session;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -21,6 +22,9 @@ public class SecurityAuditingAndTenantTest {
 
     @Mock
     private Query query;
+
+    @Mock
+    private Session session;
 
     @Mock
     private AuditLogRepository auditLogRepo;
@@ -44,17 +48,15 @@ public class SecurityAuditingAndTenantTest {
         String mockTenantId = "tenant-workspace-999";
         TenantContext.setCurrentTenant(mockTenantId);
 
-        when(entityManager.createNativeQuery(anyString())).thenReturn(query);
-        when(query.setParameter(eq("tenantId"), eq(mockTenantId))).thenReturn(query);
-        when(query.executeUpdate()).thenReturn(1);
+        when(entityManager.unwrap(Session.class)).thenReturn(session);
 
         // Act
         tenantAspect.setTenantSessionVariable();
 
         // Assert
-        verify(entityManager, times(1)).createNativeQuery("SET LOCAL app.workspace_id = :tenantId");
-        verify(query, times(1)).setParameter("tenantId", mockTenantId);
-        verify(query, times(1)).executeUpdate();
+        verify(entityManager, times(1)).unwrap(Session.class);
+        verify(session, times(1)).doWork(any());
+        verify(entityManager, never()).createNativeQuery(anyString());
 
         TenantContext.clear();
     }
@@ -68,6 +70,7 @@ public class SecurityAuditingAndTenantTest {
 
         // Assert
         verify(entityManager, never()).createNativeQuery(anyString());
+        verify(entityManager, never()).unwrap(Session.class);
     }
 
     @Test
@@ -99,5 +102,25 @@ public class SecurityAuditingAndTenantTest {
 
         // Assert
         verify(auditLogRepo, never()).save(any(AuditLog.class));
+    }
+
+    @Test
+    public void testJpaAuditAspectRedactsEntityValues() {
+        Campaign campaign = new Campaign();
+        campaign.setId("camp-redacted");
+        campaign.setName("password=secret token=abc123 apiKey=key123");
+        campaign.setAccountId("ws-1");
+
+        when(auditLogRepo.save(any(AuditLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        jpaAuditAspect.auditSave(campaign);
+
+        verify(auditLogRepo).save(argThat(audit ->
+                audit.getNewValue() != null &&
+                !audit.getNewValue().contains("secret") &&
+                !audit.getNewValue().contains("abc123") &&
+                !audit.getNewValue().contains("key123") &&
+                audit.getNewValue().contains("entityType=Campaign")
+        ));
     }
 }

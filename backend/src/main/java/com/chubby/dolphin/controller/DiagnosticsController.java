@@ -104,6 +104,28 @@ public class DiagnosticsController {
         return ResponseEntity.ok(report);
     }
 
+    @GetMapping("/db-counts")
+    public ResponseEntity<Map<String, Object>> dbCounts() {
+        Map<String, Object> map = new HashMap<>();
+        try {
+            map.put("database", jdbcTemplate.queryForObject("SELECT current_database()", String.class));
+            map.put("schema", jdbcTemplate.queryForObject("SELECT current_schema()", String.class));
+            map.put("user", jdbcTemplate.queryForObject("SELECT current_user", String.class));
+
+            map.put("users_count", jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Long.class));
+            map.put("organizations_count", jdbcTemplate.queryForObject("SELECT COUNT(*) FROM organizations", Long.class));
+            map.put("workspaces_count", jdbcTemplate.queryForObject("SELECT COUNT(*) FROM workspaces", Long.class));
+            map.put("leads_count", jdbcTemplate.queryForObject("SELECT COUNT(*) FROM leads", Long.class));
+            map.put("campaigns_count", jdbcTemplate.queryForObject("SELECT COUNT(*) FROM campaigns", Long.class));
+            map.put("invoices_count", jdbcTemplate.queryForObject("SELECT COUNT(*) FROM invoices", Long.class));
+            map.put("wallets_count", jdbcTemplate.queryForObject("SELECT COUNT(*) FROM wallets", Long.class));
+            map.put("audit_logs_count", jdbcTemplate.queryForObject("SELECT COUNT(*) FROM audit_logs", Long.class));
+        } catch (Exception e) {
+            map.put("error", e.getMessage());
+        }
+        return ResponseEntity.ok(map);
+    }
+
     /**
      * Utility component to handle Rabbit/Redis connectivity safely to prevent startup failure in unit tests.
      */

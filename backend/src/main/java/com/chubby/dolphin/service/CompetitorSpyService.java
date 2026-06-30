@@ -48,8 +48,8 @@ public class CompetitorSpyService {
 
         MetaConnection conn = metaConnRepo.findFirstByAccountIdAndTokenStatus(workspaceId, "VALID").orElse(null);
         if (conn == null || conn.getAccessToken() == null) {
-            log.warn("No active Meta connection for Ads Archive. Invoking Scraper Simulator fallback.");
-            return generateMockCompetitorAds(workspaceId, keyword);
+            log.warn("No active Meta connection for Ads Archive. Competitor intelligence requires live Meta access.");
+            return List.of();
         }
 
         try {
@@ -97,15 +97,15 @@ public class CompetitorSpyService {
             }
 
             if (ads.isEmpty()) {
-                log.info("No active Meta Ad Library records found. Using simulator fallback.");
-                return generateMockCompetitorAds(workspaceId, keyword);
+                log.info("No active Meta Ad Library records found for keyword '{}'.", keyword);
+                return List.of();
             }
 
             return ads;
 
         } catch (Exception e) {
-            log.error("❌ Failed to query Meta Ads Archive API: {}. Reverting to simulator fallback.", e.getMessage());
-            return generateMockCompetitorAds(workspaceId, keyword);
+            log.error("❌ Failed to query Meta Ads Archive API: {}", e.getMessage());
+            return List.of();
         }
     }
 
@@ -163,76 +163,4 @@ public class CompetitorSpyService {
         }
     }
 
-    /**
-     * Scraper Simulator fallback: generates simulated competitor ads based on keyword and categorizes them.
-     */
-    private List<CompetitorAd> generateMockCompetitorAds(String workspaceId, String keyword) {
-        log.info("🤖 Running Scraper Simulator fallback for keyword: {}", keyword);
-
-        String prompt = String.format("""
-                You are simulating a competitor ad intelligence parser.
-                Generate 3 different simulated competitor ad copywriting variations that are actively running in India for the keyword: "%s".
-                
-                Respond with ONLY this JSON (no explanation, no markdown, no code fences):
-                {
-                  "ads": [
-                    {
-                      "brand_name": "Acme Brand",
-                      "ad_text": " simulated ad text here ",
-                      "format": "VIDEO",
-                      "hook_type": "PAIN_POINT",
-                      "offer_type": "LEAD_GEN",
-                      "emotion": "CURIOSITY",
-                      "quality_score": 8
-                    }
-                  ]
-                }
-                """, keyword);
-
-        List<CompetitorAd> mockAds = new ArrayList<>();
-        try {
-            BusinessLlmFacadeService.LlmResponse response = llmRouter.ask(prompt);
-            JsonNode root = mapper.readTree(response.text());
-            JsonNode adsNode = root.path("ads");
-
-            if (adsNode.isArray()) {
-                for (JsonNode a : adsNode) {
-                    CompetitorAd ad = new CompetitorAd();
-                    ad.setWorkspaceId(workspaceId);
-                    ad.setKeyword(keyword);
-                    ad.setPageName(a.path("brand_name").asText("Competitor Brand"));
-                    ad.setPageId("page-" + UUID.randomUUID().toString().substring(0, 8));
-                    ad.setAdText(a.path("ad_text").asText());
-                    ad.setFormat(a.path("format").asText("IMAGE"));
-                    ad.setHookType(a.path("hook_type").asText("STATEMENT"));
-                    ad.setOfferType(a.path("offer_type").asText("INFORMATION"));
-                    ad.setEmotion(a.path("emotion").asText("CURIOSITY"));
-                    ad.setQualityScore(a.path("quality_score").asInt(7));
-                    ad.setDeliveryStartDate(LocalDate.now().minusDays(new Random().nextInt(10) + 1));
-                    ad.setSnapshotUrl("https://www.facebook.com/ads/library/?id=" + Math.abs(new Random().nextLong()));
-
-                    mockAds.add(adRepo.save(ad));
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to generate simulated competitor ad intelligence: {}", e.getMessage());
-            // Safe static fallback
-            CompetitorAd ad = new CompetitorAd();
-            ad.setWorkspaceId(workspaceId);
-            ad.setKeyword(keyword);
-            ad.setPageName("Alpha Competitor");
-            ad.setPageId("page-alpha");
-            ad.setAdText(String.format("Tired of manual marketing campaign optimization? Try the premium AI dashboard for %s today!", keyword));
-            ad.setFormat("IMAGE");
-            ad.setHookType("PAIN_POINT");
-            ad.setOfferType("FREE_TRIAL");
-            ad.setEmotion("CURIOSITY");
-            ad.setQualityScore(8);
-            ad.setDeliveryStartDate(LocalDate.now().minusDays(3));
-            ad.setSnapshotUrl("https://www.facebook.com/ads/library/");
-            mockAds.add(adRepo.save(ad));
-        }
-
-        return mockAds;
-    }
 }
