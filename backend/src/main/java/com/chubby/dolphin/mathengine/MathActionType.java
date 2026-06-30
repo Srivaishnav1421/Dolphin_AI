@@ -1,0 +1,17 @@
+package com.chubby.dolphin.mathengine;
+
+public enum MathActionType {
+    NONE,
+    ALERT_LOW_WALLET,
+    PAUSE_ALL_REQUIRED,
+    PAUSE_CAMPAIGN,
+    KILL_CAMPAIGN,
+    CHANGE_OBJECTIVE,
+    CHANGE_BUDGET,
+    REVIEW_CREATIVE,
+    REDUCE_BID,
+    REVIEW_LANDING_PAGE,
+    SCALE_CAMPAIGN,
+    INCREASE_BUDGET,
+    MONITOR
+}

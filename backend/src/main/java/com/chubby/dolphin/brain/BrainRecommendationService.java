@@ -127,7 +127,8 @@ public class BrainRecommendationService {
                 decision.setStatus("BLOCKED_BY_SAFETY");
                 decision.setReason(decision.getReason() + " [Safety Blocked]");
             } else if (policyResult == BrainAutomationPolicyService.AutomationDecision.AUTO_APPROVE) {
-                decision.setStatus("APPROVED"); // Enqueued for immediate auto-execution!
+                decision.setStatus("PENDING_APPROVAL");
+                decision.setReason(decision.getReason() + " [Local approval-first mode: auto execution disabled]");
             } else {
                 decision.setStatus("PENDING_APPROVAL");
             }
@@ -136,11 +137,6 @@ public class BrainRecommendationService {
             BrainDecision saved = decisionRepo.save(decision);
             savedList.add(saved);
 
-            // If auto-approved, publish directly to RabbitMQ queue!
-            if (policyResult == BrainAutomationPolicyService.AutomationDecision.AUTO_APPROVE) {
-                log.info("⚡ Auto-Approve rule triggered! Enqueuing decision ID: {}", saved.getId());
-                executionPublisher.publishExecution(saved.getId());
-            }
         }
 
         log.info("🧠 Brain evaluation completed. Generated {} recommendations.", savedList.size());
@@ -151,8 +147,6 @@ public class BrainRecommendationService {
     public BrainDecision approve(String id, String email) {
         log.info("🧠 Admin approved decision recommendation: {} by: {}", id, email);
         BrainDecision approved = legacyDecisionService.approveDecision(id, email);
-        // Dispatch to RabbitMQ queue for execution
-        executionPublisher.publishExecution(approved.getId());
         return approved;
     }
 

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -22,28 +23,33 @@ public class BudgetOptimizationEngine {
         List<String> overfunded = new ArrayList<>();
         List<String> scaling = new ArrayList<>();
         double wasteDetected = 0.0;
+        List<Double> cplValues = campaigns.stream()
+                .map(Campaign::getCpl)
+                .filter(v -> v != null && v > 0.0)
+                .sorted(Comparator.naturalOrder())
+                .toList();
+        double medianCpl = cplValues.isEmpty() ? 0.0 : cplValues.get(cplValues.size() / 2);
 
         for (Campaign c : campaigns) {
             double roas = c.getRoas() != null ? c.getRoas() : 2.0;
             double spent = c.getSpent() != null ? c.getSpent() : 0.0;
+            double cpl = c.getCpl() != null ? c.getCpl() : 0.0;
+            double budget = c.getBudget() != null ? c.getBudget() : 0.0;
+            boolean hasEnoughSignal = spent > Math.max(500.0, budget * 0.10);
+            boolean cplEfficient = medianCpl <= 0.0 || (cpl > 0.0 && cpl <= medianCpl * 0.85);
+            boolean cplInefficient = medianCpl > 0.0 && cpl > medianCpl * 1.25;
 
-            if (roas > 3.2 && "ACTIVE".equals(c.getStatus())) {
-                underfunded.add(c.getName() + " (ROAS: " + roas + "x)");
-                scaling.add("Scale budget of " + c.getName() + " by 25% to leverage high lead quality.");
-            } else if (roas < 1.3 && "ACTIVE".equals(c.getStatus())) {
-                overfunded.add(c.getName() + " (ROAS: " + roas + "x)");
-                wasteDetected += (spent * 0.35); // 35% of low ROI budget is considered waste leakages
+            if (!"ACTIVE".equals(c.getStatus()) || !hasEnoughSignal) {
+                continue;
             }
-        }
 
-        // Add mock fallbacks if database active campaign logs are empty
-        if (underfunded.isEmpty()) {
-            underfunded.add("Festive Smart Watch Blitz (ROAS: 4.1x)");
-            scaling.add("Scale Festive Smart Watch Blitz by 30% to capitalize on low CPL.");
-        }
-        if (overfunded.isEmpty()) {
-            overfunded.add("Legacy Awareness Banner Campaign (ROAS: 0.9x)");
-            wasteDetected = 2450.0;
+            if (roas >= 3.0 && cplEfficient) {
+                underfunded.add(c.getName() + " (ROAS: " + roas + "x, CPL: ₹" + Math.round(cpl) + ")");
+                scaling.add("Increase " + c.getName() + " by 10-15% only after the next learning window confirms CPL stability.");
+            } else if (roas < 1.4 || cplInefficient) {
+                overfunded.add(c.getName() + " (ROAS: " + roas + "x, CPL: ₹" + Math.round(cpl) + ")");
+                wasteDetected += Math.max(0.0, spent * 0.20);
+            }
         }
 
         return BudgetRecommendation.builder()

@@ -19,7 +19,7 @@ public class CompetitorMonitoringService {
     public Map<String, Object> calculateThreats(String accountId) {
         List<CompetitorInsight> insights = insightRepo.findByAccountId(accountId);
 
-        double baseThreat = 35.0; // Standard industry baseline competitor risk
+        double baseThreat = 0.0;
         List<String> threatHighlights = new ArrayList<>();
         List<String> newCompetitors = new ArrayList<>();
         List<String> opportunityGaps = new ArrayList<>();
@@ -48,13 +48,8 @@ public class CompetitorMonitoringService {
             fastGrowing.add(insight.getCompetitorUrl());
         }
 
-        // Add mock fallbacks if crawl databases are currently empty
         if (fastGrowing.isEmpty()) {
-            fastGrowing.add("https://competitor-alpha.in");
-            fastGrowing.add("https://ad-spy-beta.com");
-            newCompetitors.add("AlphaAds Ltd");
-            opportunityGaps.add("Whatsapp API automated integration remains unserved by active local competitors.");
-            threatHighlights.add("AlphaAds launched dynamic video creative sets targeting young tier-2 Indian audiences.");
+            opportunityGaps.add("Connect Meta Ad Library data or run a competitor scan to calculate live threat signals.");
         } else {
             newCompetitors.add("Disruptive AdCo (" + fastGrowing.get(0) + ")");
             opportunityGaps.add("No competitors have localized vernacular creative ad copy options.");

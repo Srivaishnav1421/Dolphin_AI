@@ -88,15 +88,15 @@ public class BrainExecutionServiceTest {
 
         when(decisionRepo.findById("d1")).thenReturn(Optional.of(d));
         when(campaignRepo.findById("c1")).thenReturn(Optional.of(c));
-        when(outcomeAnalyzer.analyze(any(), anyDouble(), anyDouble(), anyDouble(), anyDouble()))
-                .thenReturn(new ExecutionScore(1.0, 85.0, 150.0, 5.0));
-
         ExecutionResult result = executionService.executeRecommendation("d1");
 
         assertNotNull(result);
         assertEquals(ExecutionStatus.EXECUTED, result.getStatus());
+        assertEquals("EXECUTED_LOCAL_ONLY", d.getStatus());
         assertEquals("PAUSED", c.getStatus());
         verify(decisionRepo, atLeastOnce()).save(d);
         verify(campaignRepo, times(1)).save(c);
+        verify(outcomeAnalyzer, never()).analyze(any(), anyDouble(), anyDouble(), anyDouble(), anyDouble());
+        verify(learningEngine, never()).updateStats(anyString(), anyString(), anyDouble(), anyDouble(), anyDouble(), anyDouble());
     }
 }
